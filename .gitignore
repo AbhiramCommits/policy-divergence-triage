@@ -10,3 +10,6 @@ __pycache__/
 # downloaded Argoverse 2 data (regenerate with scenarios/fetch_av2.py)
 scenarios/av2_raw/
 scenarios/logs.jsonl
+
+# pipeline artifacts (checkpoints, parquet results)
+artifacts/

@@ -1,6 +1,189 @@
-"""Scenario replay harness.
+#!/usr/bin/env python3
+"""Shadow-mode harness (CLI: pdt-shadow).
 
-Not implemented yet. Will replay scenarios from scenarios/logs.jsonl through
-the rule planner (pdt_core.RulePlanner) and the learned ML policy, recording
-both trajectories for downstream divergence mining.
+Replays each scenario through the rule planner (pdt_core, pybind11) and the
+learned ML policy on identical initial conditions, with other agents replaying
+their logged tracks (non-reactive) for both systems. Scenarios are processed
+in parallel (multiprocessing) with a fixed chunk order, so output row order is
+stable across runs. Writes paired trajectories to artifacts/trajectories.parquet
+(long format) and per-scenario divergence metrics to
+artifacts/divergence.parquet. By default only the held-out 30% (by scenario id)
+is analyzed, so downstream results are never computed on training data.
 """
+
+from __future__ import annotations
+
+import argparse
+import json
+import multiprocessing as mp
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+
+import pdt_core
+
+from pdt.metrics import FIELDS, compute_metrics_row
+from pdt.policy import DECISION_NAMES, MLPolicy, POLICY_CFG, is_train_id, rollout
+
+_CTX: dict = {}
+
+
+def _worker_init(checkpoint_path: str, seed: int) -> None:
+    torch.set_num_threads(1)
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    cfg = ckpt.get("cfg", POLICY_CFG)
+    model = MLPolicy(cfg["input_dim"], cfg["hidden"], 2 * cfg["out_steps"])
+    model.load_state_dict(ckpt["state_dict"])
+    model.eval()
+    _CTX["model"] = model
+    _CTX["cfg"] = cfg
+    _CTX["seed"] = seed
+    _CTX["planner"] = pdt_core.RulePlanner()
+
+
+def state_from_dict(d: dict) -> pdt_core.State:
+    s = pdt_core.State()
+    s.t = float(d["t"])
+    s.x = float(d["x"])
+    s.y = float(d["y"])
+    s.heading = float(d["heading"])
+    s.v = float(d["v"])
+    s.a = float(d["a"])
+    return s
+
+
+def scenario_from_dict(d: dict) -> pdt_core.Scenario:
+    sc = pdt_core.Scenario()
+    sc.id = d["id"]
+    sc.tag = d.get("tag", "other")
+    sc.ego_init = state_from_dict(d["ego_init"])
+    agents = []
+    for a in d.get("agents", []):
+        ag = pdt_core.Agent()
+        ag.id = int(a["id"])
+        ag.type = a["type"]
+        ag.track = [state_from_dict(s) for s in a["track"]]
+        agents.append(ag)
+    sc.agents = agents
+    sc.centerline = [[float(x), float(y)] for x, y in d.get("centerline", [])]
+    sc.speed_limit = float(d.get("speed_limit", 0.0))
+    sc.logged_ego = [state_from_dict(s) for s in d.get("logged_ego", [])]
+    return sc
+
+
+def _run_task(task: tuple[str, int]) -> dict:
+    path, offset = task
+    with open(path, "rb") as f:
+        f.seek(offset)
+        line = f.readline().decode()
+    d = json.loads(line)
+
+    sc = scenario_from_dict(d)
+    traj = _CTX["planner"].plan(sc)
+    rule_states = np.array([[s.t, s.x, s.y, s.heading, s.v, s.a] for s in traj.states], dtype=float)
+    rule_decisions = [int(getattr(x, "value", x)) for x in traj.decisions]
+
+    ml_states, ml_decisions = rollout(d, _CTX["model"], _CTX["cfg"], _CTX["seed"])
+
+    row = compute_metrics_row(
+        d,
+        {"states": rule_states, "decisions": rule_decisions},
+        {"states": ml_states, "decisions": ml_decisions},
+    )
+    return {
+        "scenario_id": d["id"],
+        "rule_states": rule_states,
+        "rule_decisions": rule_decisions,
+        "ml_states": ml_states,
+        "ml_decisions": ml_decisions,
+        "metrics": row,
+    }
+
+
+def line_offsets(path: Path, split: str) -> list[int]:
+    offsets = []
+    with open(path, "rb") as f:
+        pos = 0
+        for raw in f:
+            line = raw.decode("utf-8", errors="replace").strip()
+            if line and not line.startswith("#"):
+                sid = None
+                try:
+                    sid = json.loads(line).get("id")
+                except json.JSONDecodeError:
+                    pass
+                if sid is None:
+                    pass
+                elif split == "held_out" and is_train_id(sid):
+                    pass
+                elif split == "train" and not is_train_id(sid):
+                    pass
+                else:
+                    offsets.append(pos)
+            pos += len(raw)
+    return offsets
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenarios", type=Path, default=Path("scenarios/logs.jsonl"))
+    parser.add_argument("--checkpoint", type=Path, default=Path("artifacts/policy.pt"))
+    parser.add_argument("--out", type=Path, default=Path("artifacts/trajectories.parquet"))
+    parser.add_argument("--metrics-out", type=Path, default=Path("artifacts/divergence.parquet"))
+    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--split", choices=["held_out", "train", "all"], default="held_out")
+    parser.add_argument("--limit", type=int, default=None)
+    args = parser.parse_args()
+
+    if not args.checkpoint.exists():
+        raise SystemExit(f"checkpoint not found: {args.checkpoint} (run python -m pdt.train_policy first)")
+
+    offsets = line_offsets(args.scenarios, args.split)
+    if args.limit:
+        offsets = offsets[: args.limit]
+    tasks = [(str(args.scenarios), off) for off in offsets]
+    print(f"running shadow replay on {len(tasks)} scenarios (split={args.split}, workers={args.workers})")
+
+    ctx = mp.get_context("fork" if "fork" in mp.get_all_start_methods() else "spawn")
+    results = []
+    with ctx.Pool(args.workers, initializer=_worker_init, initargs=(str(args.checkpoint), args.seed)) as pool:
+        for r in pool.imap(_run_task, tasks, chunksize=1):
+            results.append(r)
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for r in results:
+        for source, states, decs in (
+            ("rule", r["rule_states"], r["rule_decisions"]),
+            ("ml", r["ml_states"], r["ml_decisions"]),
+        ):
+            for i in range(len(states)):
+                rows.append(
+                    {
+                        "scenario_id": r["scenario_id"],
+                        "source": source,
+                        "step": i,
+                        "t": states[i, 0],
+                        "x": states[i, 1],
+                        "y": states[i, 2],
+                        "heading": states[i, 3],
+                        "v": states[i, 4],
+                        "a": states[i, 5],
+                        "decision": decs[i],
+                        "decision_name": DECISION_NAMES[decs[i]],
+                    }
+                )
+    pd.DataFrame(rows).to_parquet(args.out)
+    print(f"wrote {len(results)} paired trajectories ({len(rows)} rows) to {args.out}")
+
+    div = pd.DataFrame([r["metrics"] for r in results], columns=FIELDS)
+    div.to_parquet(args.metrics_out)
+    print(f"wrote {len(div)} divergence rows to {args.metrics_out}")
+
+
+if __name__ == "__main__":
+    main()

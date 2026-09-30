@@ -4,11 +4,15 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pdt"
-version = "0.1.0"
+version = "0.2.0"
 description = "Replay logged driving scenarios through rule-based and learned policies; mine, cluster, and triage divergences."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.scripts]
+pdt-shadow = "pdt.harness:main"
+pdt-query = "pdt.query:main"
 
 [project.optional-dependencies]
 pipeline = [
