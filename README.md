@@ -6,9 +6,9 @@ cluster, and triage where they diverge.
 
 Current state: the C++ core (`pdt_core`), the deterministic rule planner, the
 JSONL scenario format, the AV2 data pipeline, the learned ML policy, the
-shadow-mode replay harness, the divergence metrics, and the DuckDB query layer
-are implemented. Clustering, the review CLI, and the regression gate are still
-stubs.
+shadow-mode replay harness, the divergence metrics, the DuckDB query layer,
+the cluster analysis, and the human review CLI are implemented. The regression
+gate is still a stub.
 
 ## Repository layout
 
@@ -18,10 +18,11 @@ cpp/src/           planner.cpp (RulePlanner), scenario.cpp (JSONL I/O)
 cpp/bindings/      pybind11 module `pdt_core`
 cpp/tests/         GoogleTest suite (via FetchContent)
 python/pdt/        policy.py (MLP + rollout), train_policy.py, harness.py (pdt-shadow),
-                   metrics.py, query.py (pdt-query), geom.py; clustering/review/gate stubs
+                   metrics.py, query.py (pdt-query), cluster.py (pdt-cluster),
+                   review.py (pdt-review), geom.py; gate.py stub
 scenarios/         fetch_av2.py, convert_av2.py, manifest.txt
-tests/             pytest suite (metrics, policy) + procedurally generated 20-scenario
-                   fixture for CI (no AV2 downloads)
+labels/            cluster_labels.yaml (human-editable, version-controlled)
+tests/             pytest suite + procedurally generated 20-scenario fixture for CI
 CMakeLists.txt     builds pdt_core lib, pdt_core extension, pdt_tests
 pyproject.toml     scikit-build-core packaging (pip install -e .)
 Dockerfile         Linux build + test image (Python 3.11)
@@ -154,11 +155,13 @@ Only the scripts and `scenarios/manifest.txt` are committed.
 Full pipeline:
 
 ```sh
-python scenarios/fetch_av2.py                 # ~2 GB into scenarios/av2_raw/
+python scenarios/fetch_av2.py                 # ~0.5 GB into scenarios/av2_raw/
 python scenarios/convert_av2.py               # -> scenarios/logs.jsonl
 python -m pdt.train_policy                    # 70% train -> artifacts/policy.pt
 pdt-shadow --scenarios scenarios/logs.jsonl   # held-out 30% -> parquet artifacts
 pdt-query --query per_tag                     # per-tag divergence table
+pdt-cluster --divergence artifacts/divergence.parquet
+pdt-review                                     # label clusters -> labels/cluster_labels.yaml
 ```
 
 ### Speed limits
@@ -285,10 +288,54 @@ pdt-query --divergence artifacts/divergence.parquet --query per_tag
 pdt-query --divergence artifacts/divergence.parquet --sql "SELECT ..."
 ```
 
+## Cluster analysis (`pdt-cluster`)
+
+`python/pdt/cluster.py` takes `artifacts/divergence.parquet`, filters rows
+strictly above a configurable `divergence_score` threshold (default 0.5), and
+clusters the divergence signatures. Feature vector: 9 normalized numeric
+metric columns (lateral/final-gap/TTC-delta/jerk-delta/accel-delta/flip-count/
+progress-delta/ADE-delta; NaN TTC deltas imputed as 0), a one-hot of the first
+decision flip kind (12 fixed rule/ML pairs), and a one-hot of the scenario tag
+(7 fixed tags). Numeric columns are standardized (StandardScaler); one-hots are
+appended unscaled. Both KMeans (k swept 3..12, chosen by silhouette) and DBSCAN
+(eps swept) run; the full sweep is reported and KMeans is persisted.
+
+The fitted scaler + model persist to `artifacts/cluster_model.joblib`, so new
+runs **assign** to existing clusters rather than re-fitting — cluster ids are
+only meaningful relative to the persisted model (required for the regression
+gate). Outputs: `artifacts/clusters.parquet` (scenario_id, cluster_id,
+distance_to_centroid) and `artifacts/cluster_summary.json` (per cluster: size,
+centroid in original metric units, 5 medoid exemplar scenario_ids, and an
+auto-generated human-readable signature, e.g. "ML ASSERT where rule FOLLOW;
+ML min TTC 0.6 s lower; ML progress +43.3 m").
+
+```sh
+pdt-cluster --divergence artifacts/divergence.parquet --threshold 0.5
+```
+
+## Human triage (`pdt-review`)
+
+`python/pdt/review.py` walks clusters in descending size; per cluster it
+prints the signature, centroid metrics, and an ASCII side-by-side plot of the
+rule vs ML trajectory (x-y path and speed profile) for each of the 5 medoid
+exemplars, then prompts for `label` (desirable / undesirable / mixed),
+`rationale` (required), and an optional `ported_rule_hint`. Labels persist to
+`labels/cluster_labels.yaml` (human-editable, version-controlled); re-running
+shows existing labels and only prompts for unlabeled clusters. A matplotlib
+PNG per cluster is exported to `artifacts/plots/`.
+
+```sh
+pdt-review --non-interactive --labels labels/cluster_labels.yaml   # CI / plots only
+pdt-review                                                          # interactive triage
+```
+
+The committed `labels/cluster_labels.yaml` contains proposed labels for every
+cluster from the held-out run; review and edit them before they are consumed
+by the regression gate.
+
 ## Not yet implemented
 
-Clustering of divergence signatures, the review CLI, and the regression gate
-(see `python/pdt/*.py` stubs).
+The regression gate (`python/pdt/gate.py` stub).
 
 ## License and attribution
 

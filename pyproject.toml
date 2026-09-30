@@ -13,6 +13,8 @@ dependencies = []
 [project.scripts]
 pdt-shadow = "pdt.harness:main"
 pdt-query = "pdt.query:main"
+pdt-cluster = "pdt.cluster:main"
+pdt-review = "pdt.review:main"
 
 [project.optional-dependencies]
 pipeline = [
