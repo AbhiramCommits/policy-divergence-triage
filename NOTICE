@@ -1,0 +1,19 @@
+Argoverse 2 Attribution
+=======================
+
+This project replays scenarios from the Argoverse 2 Motion Forecasting Dataset:
+
+  Wilson, B., Qi, W., Agarwal, T., Lambert, J., Singh, J., Khandelwal, S.,
+  Pan, B., Kumar, R., Hartnett, A., Kaesemodel Pontes, J., Ramanan, D.,
+  Carr, P., and Hays, J. "Argoverse 2: Next Generation Datasets for
+  Self-Driving Perception and Forecasting." NeurIPS 2021 (Datasets and
+  Benchmarks Track). https://arxiv.org/abs/2301.00493
+
+Argoverse 2 is released under the CC BY-NC-SA 4.0 license
+(https://creativecommons.org/licenses/by-nc-sa/4.0/). It is licensed for
+non-commercial use only; derivative works must be shared under the same
+license. Any use of the dataset, including the subset downloaded by
+scenarios/fetch_av2.py, must comply with those terms.
+
+Scenario IDs are recorded in scenarios/manifest.txt for reproducibility. The
+raw data itself is never committed to this repository.

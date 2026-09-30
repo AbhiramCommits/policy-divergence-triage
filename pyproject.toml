@@ -1,0 +1,29 @@
+[build-system]
+requires = ["scikit-build-core>=0.10.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pdt"
+version = "0.1.0"
+description = "Replay logged driving scenarios through rule-based and learned policies; mine, cluster, and triage divergences."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+pipeline = [
+  "av2",
+  "numpy",
+  "pandas",
+  "pyarrow",
+  "duckdb",
+  "scikit-learn",
+  "torch",
+]
+dev = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+cmake.args = ["-DPDT_BUILD_TESTS=OFF"]
+wheel.packages = ["python/pdt"]
+sdist.include = ["cpp/**", "tests/**", "scenarios/*.py", "scenarios/manifest.txt", "CMakeLists.txt", "NOTICE"]

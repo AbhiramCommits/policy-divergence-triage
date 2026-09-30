@@ -1,0 +1,12 @@
+# build artifacts
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# downloaded Argoverse 2 data (regenerate with scenarios/fetch_av2.py)
+scenarios/av2_raw/
+scenarios/logs.jsonl
