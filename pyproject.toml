@@ -15,6 +15,8 @@ pdt-shadow = "pdt.harness:main"
 pdt-query = "pdt.query:main"
 pdt-cluster = "pdt.cluster:main"
 pdt-review = "pdt.review:main"
+pdt-ab = "pdt.ab:main"
+pdt-gate = "pdt.gate:main"
 
 [project.optional-dependencies]
 pipeline = [

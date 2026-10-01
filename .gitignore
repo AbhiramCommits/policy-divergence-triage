@@ -12,4 +12,6 @@ scenarios/av2_raw/
 scenarios/logs.jsonl
 
 # pipeline artifacts (checkpoints, parquet results)
-artifacts/
+artifacts/*
+!artifacts/ab_report.md
+!artifacts/ab_report.json

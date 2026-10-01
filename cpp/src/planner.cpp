@@ -170,10 +170,11 @@ double idm(double v, double v_leader, double gap, double v0, const PlannerConfig
 
 RulePlanner::RulePlanner(PlannerConfig config) : cfg_(config) {}
 
-Trajectory RulePlanner::plan(const Scenario& sc) const {
+Trajectory RulePlanner::plan(const Scenario& sc) {
   Trajectory traj;
   traj.scenario_id = sc.id;
   traj.source = "rule_planner";
+  last_events_.clear();
 
   const auto& cl = sc.centerline;
   const std::vector<double> cum = cum_arc(cl);
@@ -192,10 +193,15 @@ Trajectory RulePlanner::plan(const Scenario& sc) const {
     struct Result {
       Decision dec;
       double a;
+      Context ctx;
     };
+    Result res;
     const Projection proj = project(cl, cum, ego.x, ego.y);
     const double s_ego = proj.s;
     const double tangent_h = tangent_at_s(cl, cum, s_ego);
+    res.ctx.t = t;
+    res.ctx.s_ego = s_ego;
+    res.ctx.tangent_heading = tangent_h;
 
     struct C {
       double s;
@@ -211,6 +217,7 @@ Trajectory RulePlanner::plan(const Scenario& sc) const {
       if (!predict_conflict(cl, cum, st, cfg_, cf)) continue;
       if (cf.s <= s_ego - 0.5) continue;
       conflicts.push_back({cf.s, std::max(cf.t_agent, 0.0)});
+      res.ctx.conflicts.push_back({cf.s, std::max(cf.t_agent, 0.0)});
     }
 
     bool latch_alive = false;
@@ -266,6 +273,8 @@ Trajectory RulePlanner::plan(const Scenario& sc) const {
     } else {
       double gap = std::numeric_limits<double>::infinity();
       double v_leader = 0.0;
+      double s_leader = 0.0;
+      double a_leader = 0.0;
       for (const Agent& ag : sc.agents) {
         if (ag.type != "vehicle") continue;
         State st;
@@ -276,15 +285,72 @@ Trajectory RulePlanner::plan(const Scenario& sc) const {
         if (p.s > s_ego && d < gap) {
           gap = d;
           v_leader = st.v;
+          s_leader = p.s;
+          a_leader = st.a;
         }
+      }
+      if (std::isfinite(gap)) {
+        res.ctx.leader.present = true;
+        res.ctx.leader.s = s_leader;
+        res.ctx.leader.gap = gap;
+        res.ctx.leader.v = v_leader;
+        res.ctx.leader.a = a_leader;
       }
       a = idm(ego.v, v_leader, gap, sc.speed_limit, cfg_);
     }
-    return Result{dec, a};
+    res.dec = dec;
+    res.a = a;
+    return res;
+  };
+
+  const auto overrides = make_overrides(cfg_);
+  double handoff_a = 0.0;
+  bool handoff_active = false;
+
+  auto apply_overrides = [&](int step, const State& ego, auto& r) {
+    if (cfg_.overrides.empty()) return;
+    if (r.dec != Decision::FOLLOW && r.dec != Decision::ASSERT) return;
+    bool applied = false;
+    for (const auto& ov : overrides) {
+      const auto it = cfg_.overrides.find(ov->name());
+      if (it == cfg_.overrides.end() || !it->second) continue;
+      if (!ov->applicable(sc, ego, r.ctx)) continue;
+      const PlannerCommand cmd = ov->apply(sc, ego, r.ctx);
+      const GuardProfile gp = predict_guard_profile(sc, ego, r.ctx, cmd, cfg_);
+      std::string veto;
+      if (gp.min_ttc < cfg_.override_ttc_floor) {
+        veto = "veto_ttc_floor";
+      } else if (gp.max_jerk > cfg_.override_jerk_max) {
+        veto = "veto_jerk";
+      } else if (gp.min_pedestrian_dist < cfg_.override_pedestrian_buffer) {
+        veto = "veto_pedestrian_buffer";
+      }
+      if (veto.empty()) {
+        r.dec = cmd.decision;
+        r.a = cmd.accel;
+        handoff_a = cmd.accel;
+        handoff_active = true;
+        applied = true;
+        last_events_.push_back({step, ov->name(), true, "activated"});
+      } else {
+        last_events_.push_back({step, ov->name(), false, veto});
+      }
+    }
+    if (!applied && handoff_active) {
+      const double ramp = cfg_.override_jerk_max * cfg_.dt;
+      const double clamped = clampd(r.a, handoff_a - ramp, handoff_a + ramp);
+      if (clamped == r.a) {
+        handoff_active = false;
+      } else {
+        r.a = clamped;
+        handoff_a = r.a;
+      }
+    }
   };
 
   {
-    const auto r0 = compute(ego, sc.ego_init.t);
+    auto r0 = compute(ego, sc.ego_init.t);
+    apply_overrides(0, ego, r0);
     ego.a = r0.a;
     traj.states.push_back(ego);
     traj.decisions.push_back(r0.dec);
@@ -292,7 +358,8 @@ Trajectory RulePlanner::plan(const Scenario& sc) const {
 
   for (int step = 1; step <= n_steps; ++step) {
     const double t = sc.ego_init.t + step * cfg_.dt;
-    const auto r = compute(ego, t);
+    auto r = compute(ego, t);
+    apply_overrides(step, ego, r);
 
     const double v_new = std::max(0.0, ego.v + r.a * cfg_.dt);
     double x_new = ego.x;

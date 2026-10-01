@@ -1,8 +1,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <map>
 #include <string>
 
+#include "pdt/overrides.hpp"
 #include "pdt/planner.hpp"
 #include "pdt/scenario.hpp"
 #include "pdt/types.hpp"
@@ -38,6 +40,19 @@ PlannerConfig config_from_dict(py::dict d) {
   get("stop_speed", c.stop_speed);
   get("vehicle_length", c.vehicle_length);
   get("lane_half_width", c.lane_half_width);
+  get("override_ttc_floor", c.override_ttc_floor);
+  get("override_jerk_max", c.override_jerk_max);
+  get("override_pedestrian_buffer", c.override_pedestrian_buffer);
+  get("override_predict_horizon", c.override_predict_horizon);
+  get("early_brake_leader_decel_threshold", c.early_brake_leader_decel_threshold);
+  get("early_brake_max_decel", c.early_brake_max_decel);
+  get("early_brake_stop_gap", c.early_brake_stop_gap);
+  get("early_brake_wait_gap", c.early_brake_wait_gap);
+  get("early_brake_wait_speed", c.early_brake_wait_speed);
+  get("early_brake_obstacle_lateral", c.early_brake_obstacle_lateral);
+  if (d.contains("overrides")) {
+    c.overrides = py::cast<std::map<std::string, bool>>(d["overrides"]);
+  }
   return c;
 }
 
@@ -111,11 +126,29 @@ PYBIND11_MODULE(pdt_core, m) {
       .def_readwrite("ttc_min_speed", &PlannerConfig::ttc_min_speed)
       .def_readwrite("stop_speed", &PlannerConfig::stop_speed)
       .def_readwrite("vehicle_length", &PlannerConfig::vehicle_length)
-      .def_readwrite("lane_half_width", &PlannerConfig::lane_half_width);
+      .def_readwrite("lane_half_width", &PlannerConfig::lane_half_width)
+      .def_readwrite("overrides", &PlannerConfig::overrides)
+      .def_readwrite("override_ttc_floor", &PlannerConfig::override_ttc_floor)
+      .def_readwrite("override_jerk_max", &PlannerConfig::override_jerk_max)
+      .def_readwrite("override_pedestrian_buffer", &PlannerConfig::override_pedestrian_buffer)
+      .def_readwrite("override_predict_horizon", &PlannerConfig::override_predict_horizon)
+      .def_readwrite("early_brake_leader_decel_threshold", &PlannerConfig::early_brake_leader_decel_threshold)
+      .def_readwrite("early_brake_max_decel", &PlannerConfig::early_brake_max_decel)
+      .def_readwrite("early_brake_stop_gap", &PlannerConfig::early_brake_stop_gap)
+      .def_readwrite("early_brake_wait_gap", &PlannerConfig::early_brake_wait_gap)
+      .def_readwrite("early_brake_wait_speed", &PlannerConfig::early_brake_wait_speed)
+      .def_readwrite("early_brake_obstacle_lateral", &PlannerConfig::early_brake_obstacle_lateral);
+
+  py::class_<OverrideEvent>(m, "OverrideEvent")
+      .def_readonly("step", &OverrideEvent::step)
+      .def_readonly("name", &OverrideEvent::name)
+      .def_readonly("active", &OverrideEvent::active)
+      .def_readonly("reason", &OverrideEvent::reason);
 
   py::class_<RulePlanner>(m, "RulePlanner")
       .def(py::init<const PlannerConfig&>(), py::arg("config") = PlannerConfig{})
-      .def("plan", &RulePlanner::plan, py::arg("scenario"));
+      .def("plan", &RulePlanner::plan, py::arg("scenario"))
+      .def("events", &RulePlanner::events);
 
   m.def("load_scenarios", &load_scenarios, py::arg("path"));
   m.def("save_scenarios", &save_scenarios, py::arg("scenarios"), py::arg("path"));

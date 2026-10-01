@@ -1,5 +1,9 @@
 #pragma once
 
+#include <map>
+#include <string>
+
+#include "pdt/overrides.hpp"
 #include "pdt/types.hpp"
 
 namespace pdt {
@@ -26,15 +30,28 @@ struct PlannerConfig {
   double stop_speed = 0.05;
   double vehicle_length = 4.5;
   double lane_half_width = 2.5;
+  std::map<std::string, bool> overrides;
+  double override_ttc_floor = 1.0;
+  double override_jerk_max = 20.0;
+  double override_pedestrian_buffer = 3.0;
+  double override_predict_horizon = 2.0;
+  double early_brake_leader_decel_threshold = -2.5;
+  double early_brake_max_decel = 3.5;
+  double early_brake_stop_gap = 4.0;
+  double early_brake_wait_gap = 10.0;
+  double early_brake_wait_speed = 1.5;
+  double early_brake_obstacle_lateral = 5.0;
 };
 
 class RulePlanner {
  public:
   explicit RulePlanner(PlannerConfig config = {});
-  Trajectory plan(const Scenario& scenario) const;
+  Trajectory plan(const Scenario& scenario);
+  const std::vector<OverrideEvent>& events() const { return last_events_; }
 
  private:
   PlannerConfig cfg_;
+  std::vector<OverrideEvent> last_events_;
 };
 
 }  // namespace pdt

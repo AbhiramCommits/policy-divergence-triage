@@ -1,0 +1,7 @@
+# Regression gate thresholds (pdt-gate).
+thresholds:
+  hard_brake_increase_tolerance: 2
+  jerk_p95_rel_tolerance: 0.05
+  non_target_undesirable_rate_rise_tolerance: 0.03
+  non_target_cluster_min_size: 5
+  new_cluster_min_size: 5

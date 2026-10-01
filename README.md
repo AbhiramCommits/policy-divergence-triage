@@ -4,24 +4,25 @@ Replay real logged driving scenarios (Argoverse 2 Motion Forecasting) through
 both a learned ML policy and a deterministic rule-based C++ planner, then mine,
 cluster, and triage where they diverge.
 
-Current state: the C++ core (`pdt_core`), the deterministic rule planner, the
-JSONL scenario format, the AV2 data pipeline, the learned ML policy, the
-shadow-mode replay harness, the divergence metrics, the DuckDB query layer,
-the cluster analysis, and the human review CLI are implemented. The regression
-gate is still a stub.
+Current state: the C++ core (`pdt_core`), the deterministic rule planner with
+guarded behavior overrides, the JSONL scenario format, the AV2 data pipeline,
+the learned ML policy, the shadow-mode replay harness, the divergence metrics,
+the DuckDB query layer, the cluster analysis, the human review CLI, the A/B
+study, and the regression gate are all implemented.
 
 ## Repository layout
 
 ```
-cpp/include/pdt/   types.hpp, planner.hpp, scenario.hpp
-cpp/src/           planner.cpp (RulePlanner), scenario.cpp (JSONL I/O)
+cpp/include/pdt/   types.hpp, planner.hpp, overrides.hpp, scenario.hpp
+cpp/src/           planner.cpp (RulePlanner), overrides.cpp, scenario.cpp
 cpp/bindings/      pybind11 module `pdt_core`
 cpp/tests/         GoogleTest suite (via FetchContent)
 python/pdt/        policy.py (MLP + rollout), train_policy.py, harness.py (pdt-shadow),
                    metrics.py, query.py (pdt-query), cluster.py (pdt-cluster),
-                   review.py (pdt-review), geom.py; gate.py stub
+                   review.py (pdt-review), ab.py (pdt-ab), gate.py (pdt-gate), geom.py
 scenarios/         fetch_av2.py, convert_av2.py, manifest.txt
 labels/            cluster_labels.yaml (human-editable, version-controlled)
+gate_config.yaml   regression gate thresholds
 tests/             pytest suite + procedurally generated 20-scenario fixture for CI
 CMakeLists.txt     builds pdt_core lib, pdt_core extension, pdt_tests
 pyproject.toml     scikit-build-core packaging (pip install -e .)
@@ -119,6 +120,46 @@ traj = planner.plan(scenario)
 | `vehicle_length`         | 4.5     | subtracted from leader gap (m)                 |
 | `lane_half_width`        | 2.5     | lateral window for "in-lane leader" (m)        |
 
+### Behavior overrides (`cpp/include/pdt/overrides.hpp`, `cpp/src/overrides.cpp`)
+
+Desirable ML behavior found by the triage is ported into the production
+planner as explicit, guarded overrides implementing the `Override` interface
+(`applicable(scenario, ego, context)` + `apply(...)` -> `PlannerCommand`).
+Overrides are individually toggleable by name via `PlannerConfig.overrides`
+(default OFF), so before/after is a config flag, not a code revert.
+
+- `early_braking` (ported from cluster 2, "early stop-and-wait under hard lead
+  braking"): when the nearest forward vehicle within
+  `early_brake_obstacle_lateral` m of the path is braking harder than
+  `early_brake_leader_decel_threshold`, or is near-stopped within
+  `early_brake_wait_gap`, brake early (ramped at most `override_jerk_max` per
+  step) to stop at `early_brake_stop_gap` m behind it and wait.
+- Mandatory guards (every override, non-negotiable): veto when the predicted
+  min TTC over the override profile is below `override_ttc_floor`, when
+  predicted jerk exceeds `override_jerk_max`, or when a pedestrian is inside
+  `override_pedestrian_buffer`. Every activation and veto is logged with its
+  reason and exposed as `RulePlanner.events()` (the harness writes them to
+  `artifacts/override_events.parquet`). On release, the planner ramps back to
+  the base command at `override_jerk_max` to avoid jerk spikes.
+
+| Config field | Default | Meaning |
+|---|---|---|
+| `overrides` | `{}` (all OFF) | override name -> enabled |
+| `override_ttc_floor` | 1.0 | min predicted TTC before veto (s) |
+| `override_jerk_max` | 20.0 | max predicted jerk before veto (m/s^3) |
+| `override_pedestrian_buffer` | 3.0 | pedestrian veto distance (m) |
+| `override_predict_horizon` | 2.0 | guard prediction horizon (s) |
+| `early_brake_leader_decel_threshold` | -2.5 | hard-braking leader (m/s^2) |
+| `early_brake_max_decel` | 3.5 | override max decel (m/s^2) |
+| `early_brake_stop_gap` | 4.0 | stop gap behind the obstacle (m) |
+| `early_brake_wait_gap` | 10.0 | wait-hold range behind a slow vehicle (m) |
+| `early_brake_wait_speed` | 1.5 | below this the vehicle counts as slow (m/s) |
+| `early_brake_obstacle_lateral` | 5.0 | widened forward-obstacle corridor (m) |
+
+Known limitation (measured, not fixed): collisions caused by the stitched
+centerline diverging from the actual road (obstacles > 5 m off the planned
+path) are outside any rule that sees only the planner's world model.
+
 ### Scenario format
 
 `scenarios/logs.jsonl`: one JSON object per line, matching `Scenario`:
@@ -162,6 +203,8 @@ pdt-shadow --scenarios scenarios/logs.jsonl   # held-out 30% -> parquet artifact
 pdt-query --query per_tag                     # per-tag divergence table
 pdt-cluster --divergence artifacts/divergence.parquet
 pdt-review                                     # label clusters -> labels/cluster_labels.yaml
+pdt-ab                                         # overrides OFF vs ON -> artifacts/ab_report.md
+pdt-gate                                       # regression gate
 ```
 
 ### Speed limits
@@ -333,9 +376,42 @@ The committed `labels/cluster_labels.yaml` contains proposed labels for every
 cluster from the held-out run; review and edit them before they are consumed
 by the regression gate.
 
-## Not yet implemented
+## A/B study (`pdt-ab`)
 
-The regression gate (`python/pdt/gate.py` stub).
+Ports a desirable behavior into the planner and measures it. Runs the full
+held-out suite twice — baseline (overrides OFF) and candidate (overrides ON) —
+assigns both runs through the *persisted* cluster model, and emits
+`artifacts/ab_report.md` + `ab_report.json`. Target cluster selection is
+data-driven: the desirable-labeled cluster (>= 10 scenarios) where the ML
+behavior removes the most rule collisions. The report contains the
+target-cluster undesirable-rate drop (including a fixed-population comparison
+over the baseline cluster's scenario ids), a no-regression check across every
+other cluster, global safety metrics (collision count, hard-brake count, p95
+max jerk, mean progress, mean min TTC), and override activation/veto counts
+with a veto-reason breakdown.
+
+```sh
+pdt-ab --scenarios scenarios/logs.jsonl
+```
+
+Measured result (committed `artifacts/ab_report.md`, held-out 602 scenarios):
+target cluster 2 fixed-population undesirable rate 0.340 -> 0.289, global
+collisions 210 -> 196, hard brakes 0 -> 0, p95 max jerk 34.5 -> 33.8 m/s^3,
+mean min TTC 1.22 -> 1.44 s, mean progress 56.9 -> 53.8 m (the expected cost
+of stop-and-wait), 7,301 activations / 76 vetoes, no per-cluster regressions.
+
+## Regression gate (`pdt-gate`)
+
+Blocks merges when the override regresses safety. Thresholds live in
+`gate_config.yaml`. Exits non-zero when any of: collision count increased,
+hard-brake count increased beyond tolerance, p95 max jerk regressed beyond
+tolerance, any non-target cluster's undesirable rate rose beyond tolerance, or
+a new cluster appeared with size above a threshold (unmodeled behavior).
+Prints a pass/fail table naming the failed checks.
+
+```sh
+pdt-gate --report artifacts/ab_report.json --config gate_config.yaml
+```
 
 ## License and attribution
 

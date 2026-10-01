@@ -31,17 +31,20 @@ from pdt.policy import DECISION_NAMES, MLPolicy, POLICY_CFG, is_train_id, rollou
 _CTX: dict = {}
 
 
-def _worker_init(checkpoint_path: str, seed: int) -> None:
+def _worker_init(checkpoint_path: str, seed: int, overrides: dict) -> None:
     torch.set_num_threads(1)
     ckpt = torch.load(checkpoint_path, map_location="cpu")
     cfg = ckpt.get("cfg", POLICY_CFG)
     model = MLPolicy(cfg["input_dim"], cfg["hidden"], 2 * cfg["out_steps"])
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
+    planner_cfg = pdt_core.PlannerConfig()
+    if overrides:
+        planner_cfg.overrides = {k: bool(v) for k, v in overrides.items()}
     _CTX["model"] = model
     _CTX["cfg"] = cfg
     _CTX["seed"] = seed
-    _CTX["planner"] = pdt_core.RulePlanner()
+    _CTX["planner"] = pdt_core.RulePlanner(planner_cfg)
 
 
 def state_from_dict(d: dict) -> pdt_core.State:
@@ -85,6 +88,7 @@ def _run_task(task: tuple[str, int]) -> dict:
     traj = _CTX["planner"].plan(sc)
     rule_states = np.array([[s.t, s.x, s.y, s.heading, s.v, s.a] for s in traj.states], dtype=float)
     rule_decisions = [int(getattr(x, "value", x)) for x in traj.decisions]
+    events = [{"step": e.step, "name": e.name, "active": bool(e.active), "reason": e.reason} for e in _CTX["planner"].events()]
 
     ml_states, ml_decisions = rollout(d, _CTX["model"], _CTX["cfg"], _CTX["seed"])
 
@@ -100,6 +104,7 @@ def _run_task(task: tuple[str, int]) -> dict:
         "ml_states": ml_states,
         "ml_decisions": ml_decisions,
         "metrics": row,
+        "events": events,
     }
 
 
@@ -127,30 +132,21 @@ def line_offsets(path: Path, split: str) -> list[int]:
     return offsets
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scenarios", type=Path, default=Path("scenarios/logs.jsonl"))
-    parser.add_argument("--checkpoint", type=Path, default=Path("artifacts/policy.pt"))
-    parser.add_argument("--out", type=Path, default=Path("artifacts/trajectories.parquet"))
-    parser.add_argument("--metrics-out", type=Path, default=Path("artifacts/divergence.parquet"))
-    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--split", choices=["held_out", "train", "all"], default="held_out")
-    parser.add_argument("--limit", type=int, default=None)
-    args = parser.parse_args()
-
+def run(args: argparse.Namespace) -> None:
     if not args.checkpoint.exists():
         raise SystemExit(f"checkpoint not found: {args.checkpoint} (run python -m pdt.train_policy first)")
+
+    overrides = json.loads(args.overrides) if args.overrides else {}
 
     offsets = line_offsets(args.scenarios, args.split)
     if args.limit:
         offsets = offsets[: args.limit]
     tasks = [(str(args.scenarios), off) for off in offsets]
-    print(f"running shadow replay on {len(tasks)} scenarios (split={args.split}, workers={args.workers})")
+    print(f"running shadow replay on {len(tasks)} scenarios (split={args.split}, workers={args.workers}, overrides={overrides or 'none'})")
 
     ctx = mp.get_context("fork" if "fork" in mp.get_all_start_methods() else "spawn")
     results = []
-    with ctx.Pool(args.workers, initializer=_worker_init, initargs=(str(args.checkpoint), args.seed)) as pool:
+    with ctx.Pool(args.workers, initializer=_worker_init, initargs=(str(args.checkpoint), args.seed, overrides)) as pool:
         for r in pool.imap(_run_task, tasks, chunksize=1):
             results.append(r)
 
@@ -183,6 +179,29 @@ def main() -> None:
     div = pd.DataFrame([r["metrics"] for r in results], columns=FIELDS)
     div.to_parquet(args.metrics_out)
     print(f"wrote {len(div)} divergence rows to {args.metrics_out}")
+
+    event_rows = []
+    for r in results:
+        for e in r["events"]:
+            event_rows.append({"scenario_id": r["scenario_id"], **e})
+    pd.DataFrame(event_rows, columns=["scenario_id", "step", "name", "active", "reason"]).to_parquet(args.events_out)
+    print(f"wrote {len(event_rows)} override events to {args.events_out}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenarios", type=Path, default=Path("scenarios/logs.jsonl"))
+    parser.add_argument("--checkpoint", type=Path, default=Path("artifacts/policy.pt"))
+    parser.add_argument("--out", type=Path, default=Path("artifacts/trajectories.parquet"))
+    parser.add_argument("--metrics-out", type=Path, default=Path("artifacts/divergence.parquet"))
+    parser.add_argument("--events-out", type=Path, default=Path("artifacts/override_events.parquet"))
+    parser.add_argument("--overrides", type=str, default=None, help='JSON dict, e.g. \'{"early_braking": true}\'')
+    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--split", choices=["held_out", "train", "all"], default="held_out")
+    parser.add_argument("--limit", type=int, default=None)
+    args = parser.parse_args()
+    run(args)
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 add_library(pdt_core_lib STATIC
   cpp/src/planner.cpp
+  cpp/src/overrides.cpp
   cpp/src/scenario.cpp
 )
 target_include_directories(pdt_core_lib PUBLIC cpp/include)
@@ -49,6 +50,7 @@ if(PDT_BUILD_TESTS)
   add_executable(pdt_tests
     cpp/tests/test_planner.cpp
     cpp/tests/test_scenario_io.cpp
+    cpp/tests/test_overrides.cpp
   )
   target_link_libraries(pdt_tests PRIVATE pdt_core_lib GTest::gtest_main)
   target_compile_definitions(pdt_tests PRIVATE
