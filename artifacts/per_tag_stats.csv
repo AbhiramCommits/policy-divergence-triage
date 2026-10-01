@@ -1,0 +1,8 @@
+tag,n,mean_score,max_score,avg_flips
+lane_change,21,0.7157,0.8883,36.14
+left_turn,70,0.656,0.9106,41.49
+lead_vehicle_braking,200,0.6522,0.904,28.78
+straight_through_intersection,86,0.6474,0.9045,27.76
+right_turn,72,0.6469,0.9466,41.26
+ped_or_cyclist_interaction,105,0.6431,0.9211,31.79
+other,48,0.6242,0.9017,17.75

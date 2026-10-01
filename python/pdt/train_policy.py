@@ -62,17 +62,7 @@ def load_scenario_dicts(path: Path) -> list[dict]:
     return out
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scenarios", type=Path, default=Path("scenarios/logs.jsonl"))
-    parser.add_argument("--out", type=Path, default=Path("artifacts/policy.pt"))
-    parser.add_argument("--log", type=Path, default=Path("artifacts/train_log.jsonl"))
-    parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--seed", type=int, default=0)
-    args = parser.parse_args()
-
+def run(args: argparse.Namespace) -> None:
     torch.manual_seed(args.seed)
     torch.set_num_threads(max(1, (torch.get_num_threads() + 1) // 2))
 
@@ -175,6 +165,19 @@ def main() -> None:
     }
     torch.save(ckpt, args.out)
     print(f"saved checkpoint to {args.out}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--scenarios", type=Path, default=Path("scenarios/logs.jsonl"))
+    parser.add_argument("--out", type=Path, default=Path("artifacts/policy.pt"))
+    parser.add_argument("--log", type=Path, default=Path("artifacts/train_log.jsonl"))
+    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--seed", type=int, default=0)
+    args = parser.parse_args()
+    run(args)
 
 
 if __name__ == "__main__":

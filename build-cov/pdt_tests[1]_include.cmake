@@ -1,0 +1,5 @@
+if(EXISTS "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests[1]_tests.cmake")
+  include("/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests[1]_tests.cmake")
+else()
+  add_test(pdt_tests_NOT_BUILT pdt_tests_NOT_BUILT)
+endif()

@@ -1,0 +1,12 @@
+.git/
+build/
+build-cov/
+artifacts/
+scenarios/av2_raw/
+scenarios/logs.jsonl
+labels/fixture_labels.yaml
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+*.pyc

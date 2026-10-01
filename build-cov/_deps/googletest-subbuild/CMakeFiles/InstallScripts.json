@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-subbuild/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

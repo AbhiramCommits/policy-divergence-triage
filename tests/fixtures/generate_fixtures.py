@@ -26,6 +26,8 @@ OUT = Path(__file__).resolve().parent / "scenarios.jsonl"
 DT = 0.1
 HORIZON = 8.0
 N_STEPS = int(round(HORIZON / DT))
+LOG_HORIZON = 11.0
+LOG_STEPS = int(round(LOG_HORIZON / DT))
 
 
 def state(t, x, y, heading, v, a=0.0):
@@ -91,7 +93,7 @@ def straight_free(i):
             return -0.8, 0.0
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, step_fn)
     return scenario(f"fixture_straight_{i:02d}", "other", straight_cl(), 10.0, 0.0, limit, [], logged)
 
 
@@ -118,7 +120,7 @@ def lead_braking(i):
             a = -4.0 if v > 0.0 else 0.0
         return x, 0.0, 0.0, v, a
 
-    logged = track_of(human_fn)
+    logged = track_of(human_fn, t1=LOG_HORIZON)
     return scenario(
         f"fixture_lead_{i:02d}",
         "lead_vehicle_braking",
@@ -144,7 +146,7 @@ def ped_yield():
             return -1.8 if v > 0.0 else 0.0, 0.0
         return 1.5 if v < 11.18 else 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, human_fn)
     return scenario(
         "fixture_ped_00",
         "ped_or_cyclist_interaction",
@@ -166,7 +168,7 @@ def cyclist_yield():
     def human_fn(t, x, y, h, v):
         return (-1.5 if t < 5.0 else 1.0), 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, human_fn)
     return scenario(
         "fixture_ped_01",
         "ped_or_cyclist_interaction",
@@ -188,7 +190,7 @@ def ped_assert():
     def human_fn(t, x, y, h, v):
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, human_fn)
     return scenario(
         "fixture_ped_02",
         "ped_or_cyclist_interaction",
@@ -215,7 +217,7 @@ def crossing_vehicle(i):
             return (-1.2 if t < 3.0 else 1.0), 0.0
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, human_fn)
     return scenario(
         f"fixture_intersection_{i:02d}",
         "straight_through_intersection",
@@ -237,7 +239,7 @@ def left_turn():
         h_dot = v / r if t < 6.28 else 0.0
         return a, h_dot
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, step_fn)
     return scenario("fixture_turn_left_00", "left_turn", cl, 10.0, 0.0, 11.18, [], logged)
 
 
@@ -253,7 +255,7 @@ def right_turn():
         h_dot = -v / r if t < 6.28 else 0.0
         return a, h_dot
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, step_fn)
     return scenario("fixture_turn_right_00", "right_turn", cl, 10.0, 0.0, 11.18, [], logged)
 
 
@@ -267,7 +269,7 @@ def lane_change(i):
             return 0.0, -sgn * 0.25
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, step_fn)
     return scenario(f"fixture_lanechange_{i:02d}", "lane_change", straight_cl(), 10.0, 0.0, 11.18, [], logged)
 
 
@@ -284,7 +286,7 @@ def mixed_slow_leader():
             return -2.0, 0.0
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 7.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 7.0), LOG_STEPS, DT, human_fn)
     return scenario(
         "fixture_mixed_00",
         "other",
@@ -309,7 +311,7 @@ def mixed_s_curve():
         a = 0.5 if v < 11.18 else 0.0
         return a, h_dot
 
-    logged = integrate((0.0, 0.0, 0.0, 8.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 8.0), LOG_STEPS, DT, step_fn)
     return scenario("fixture_mixed_01", "other", cl, 8.0, 0.0, 11.18, [], logged)
 
 
@@ -317,7 +319,7 @@ def mixed_accel():
     def step_fn(t, x, y, h, v):
         return (1.0 if v < 8.94 else 0.0), 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 2.0), N_STEPS, DT, step_fn)
+    logged = integrate((0.0, 0.0, 0.0, 2.0), LOG_STEPS, DT, step_fn)
     return scenario("fixture_mixed_02", "other", straight_cl(), 2.0, 0.0, 8.94, [], logged)
 
 
@@ -330,7 +332,7 @@ def mixed_sidewalk_ped():
     def human_fn(t, x, y, h, v):
         return 0.0, 0.0
 
-    logged = integrate((0.0, 0.0, 0.0, 10.0), N_STEPS, DT, human_fn)
+    logged = integrate((0.0, 0.0, 0.0, 10.0), LOG_STEPS, DT, human_fn)
     return scenario(
         "fixture_mixed_03",
         "other",

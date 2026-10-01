@@ -15,3 +15,8 @@ scenarios/logs.jsonl
 artifacts/*
 !artifacts/ab_report.md
 !artifacts/ab_report.json
+!artifacts/cluster_summary.json
+!artifacts/per_tag_stats.csv
+
+# generated fixture labels (CI; the human labels file is committed)
+labels/fixture_labels.yaml

@@ -236,28 +236,17 @@ def run_shadow_subprocess(overrides_json: str | None, out_dir: Path, args: argpa
         raise SystemExit(f"harness run failed with exit code {proc.returncode}")
 
 
-def run_ab(args: argparse.Namespace) -> dict:
-    out_dir = Path(args.out_dir)
-    a_dir = out_dir / "ab" / "baseline"
-    b_dir = out_dir / "ab" / "candidate"
-
-    labels = load_labels(args.labels)
-
-    if not args.report_only:
-        print("=== run A: baseline (overrides OFF) ===")
-        run_shadow_subprocess(None, a_dir, args)
-        print("=== run B: candidate (override ON) ===")
-        run_shadow_subprocess(json.dumps({args.override: True}), b_dir, args)
-
+def build_report_from_runs(a_dir: Path, b_dir: Path, model_path: Path, labels: dict,
+                           override_name: str, min_target_size: int = MIN_TARGET_SIZE) -> dict:
     div_before = pd.read_parquet(a_dir / "divergence.parquet")
     div_after = pd.read_parquet(b_dir / "divergence.parquet")
-    d_before, labels_before = assign_through_model(Path(args.model), div_before)
-    d_after, labels_after = assign_through_model(Path(args.model), div_after)
+    d_before, labels_before = assign_through_model(Path(model_path), div_before)
+    d_after, labels_after = assign_through_model(Path(model_path), div_after)
 
     per_before = per_cluster(d_before, labels_before)
     per_after = per_cluster(d_after, labels_after)
 
-    target = select_target(per_before, labels, min_size=args.min_target_size)
+    target = select_target(per_before, labels, min_size=min_target_size)
     if target is None:
         raise SystemExit("no desirable cluster with enough scenarios found in the baseline run")
 
@@ -268,7 +257,7 @@ def run_ab(args: argparse.Namespace) -> dict:
 
     events = pd.read_parquet(b_dir / "override_events.parquet")
     report = build_report(per_before, per_after, global_metrics(d_before), global_metrics(d_after),
-                          labels, target, args.override, events)
+                          labels, target, override_name, events)
     report["cluster_labels"] = {cid: (labels["clusters"].get(cid) or {}).get("label") for cid in
                                 set(per_before) | set(per_after)}
     report["headline"]["fixed_population_undesirable_rate_after"] = fixed_rate_after
@@ -276,13 +265,43 @@ def run_ab(args: argparse.Namespace) -> dict:
     report["headline"]["drop_pp_fixed_population"] = (
         before_target_rate(per_before, target) - fixed_rate_after
     )
+    return report
+
+
+def run_ab(args: argparse.Namespace) -> dict:
+    out_dir = Path(args.out_dir)
+    a_dir = out_dir / "ab" / "baseline"
+    b_dir = out_dir / "ab" / "candidate"
+
+    labels = load_labels(args.labels)
+
+    if not args.report_only:
+        if args.baseline_divergence:
+            a_dir.mkdir(parents=True, exist_ok=True)
+            pd.read_parquet(args.baseline_divergence).to_parquet(a_dir / "divergence.parquet")
+            src_events = Path(args.baseline_events) if args.baseline_events else None
+            if src_events and Path(src_events).exists():
+                pd.read_parquet(src_events).to_parquet(a_dir / "override_events.parquet")
+            else:
+                pd.DataFrame(columns=["scenario_id", "step", "name", "active", "reason"]).to_parquet(
+                    a_dir / "override_events.parquet"
+                )
+            print(f"reusing baseline divergence from {args.baseline_divergence}")
+        else:
+            print("=== run A: baseline (overrides OFF) ===")
+            run_shadow_subprocess(None, a_dir, args)
+        print("=== run B: candidate (override ON) ===")
+        run_shadow_subprocess(json.dumps({args.override: True}), b_dir, args)
+
+    report = build_report_from_runs(a_dir, b_dir, Path(args.model), labels, args.override,
+                                    min_target_size=args.min_target_size)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "ab_report.json").write_text(json.dumps(report, indent=2))
     (out_dir / "ab_report.md").write_text(render_md(report))
     print(f"wrote {out_dir / 'ab_report.md'} and {out_dir / 'ab_report.json'}")
     h = report["headline"]
-    print(f"headline: target cluster {target} undesirable rate {h['undesirable_rate_before']:.3f} -> "
+    print(f"headline: target cluster {report['target_cluster']} undesirable rate {h['undesirable_rate_before']:.3f} -> "
           f"{h['fixed_population_undesirable_rate_after']:.3f} fixed-population "
           f"(drop {h['drop_pp_fixed_population'] * 100:.1f} pp)")
     return report
@@ -302,6 +321,10 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--report-only", action="store_true",
                         help="skip the harness runs and rebuild the report from artifacts/ab/")
+    parser.add_argument("--baseline-divergence", type=Path, default=None,
+                        help="reuse an existing baseline divergence.parquet instead of re-running run A")
+    parser.add_argument("--baseline-events", type=Path, default=None,
+                        help="override events parquet matching --baseline-divergence")
     args = parser.parse_args()
     run_ab(args)
 

@@ -1,0 +1,8 @@
+services:
+  pdt:
+    build: .
+    cpus: 4
+    command: ["make", "pipeline"]
+    volumes:
+      - ./artifacts:/src/artifacts
+      - ./scenarios/av2_raw:/src/scenarios/av2_raw

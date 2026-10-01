@@ -1,0 +1,408 @@
+Start testing: Oct 01 02:21 PDT
+----------------------------------------------------------
+1/15 Testing: PlannerTest.DeterministicAcrossFixtures
+1/15 Test: PlannerTest.DeterministicAcrossFixtures
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=PlannerTest.DeterministicAcrossFixtures" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"PlannerTest.DeterministicAcrossFixtures" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = PlannerTest.DeterministicAcrossFixtures
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PlannerTest
+[ RUN      ] PlannerTest.DeterministicAcrossFixtures
+[       OK ] PlannerTest.DeterministicAcrossFixtures (353 ms)
+[----------] 1 test from PlannerTest (353 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (353 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.37 sec
+----------------------------------------------------------
+Test Passed.
+"PlannerTest.DeterministicAcrossFixtures" end time: Oct 01 02:21 PDT
+"PlannerTest.DeterministicAcrossFixtures" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/15 Testing: PlannerTest.AccelWithinConfigBounds
+2/15 Test: PlannerTest.AccelWithinConfigBounds
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=PlannerTest.AccelWithinConfigBounds" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"PlannerTest.AccelWithinConfigBounds" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = PlannerTest.AccelWithinConfigBounds
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PlannerTest
+[ RUN      ] PlannerTest.AccelWithinConfigBounds
+[       OK ] PlannerTest.AccelWithinConfigBounds (169 ms)
+[----------] 1 test from PlannerTest (169 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (169 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.20 sec
+----------------------------------------------------------
+Test Passed.
+"PlannerTest.AccelWithinConfigBounds" end time: Oct 01 02:21 PDT
+"PlannerTest.AccelWithinConfigBounds" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/15 Testing: PlannerTest.YieldStopsBeforeConflictPoint
+3/15 Test: PlannerTest.YieldStopsBeforeConflictPoint
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=PlannerTest.YieldStopsBeforeConflictPoint" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"PlannerTest.YieldStopsBeforeConflictPoint" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = PlannerTest.YieldStopsBeforeConflictPoint
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PlannerTest
+[ RUN      ] PlannerTest.YieldStopsBeforeConflictPoint
+[       OK ] PlannerTest.YieldStopsBeforeConflictPoint (152 ms)
+[----------] 1 test from PlannerTest (152 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (152 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.18 sec
+----------------------------------------------------------
+Test Passed.
+"PlannerTest.YieldStopsBeforeConflictPoint" end time: Oct 01 02:21 PDT
+"PlannerTest.YieldStopsBeforeConflictPoint" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/15 Testing: PlannerTest.PurePursuitConvergesToCenterline
+4/15 Test: PlannerTest.PurePursuitConvergesToCenterline
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=PlannerTest.PurePursuitConvergesToCenterline" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"PlannerTest.PurePursuitConvergesToCenterline" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = PlannerTest.PurePursuitConvergesToCenterline
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from PlannerTest
+[ RUN      ] PlannerTest.PurePursuitConvergesToCenterline
+[       OK ] PlannerTest.PurePursuitConvergesToCenterline (2 ms)
+[----------] 1 test from PlannerTest (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"PlannerTest.PurePursuitConvergesToCenterline" end time: Oct 01 02:21 PDT
+"PlannerTest.PurePursuitConvergesToCenterline" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/15 Testing: IdmTest.FreeFlowAcceleratesAtIdmMaxAccel
+5/15 Test: IdmTest.FreeFlowAcceleratesAtIdmMaxAccel
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=IdmTest.FreeFlowAcceleratesAtIdmMaxAccel" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"IdmTest.FreeFlowAcceleratesAtIdmMaxAccel" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = IdmTest.FreeFlowAcceleratesAtIdmMaxAccel
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from IdmTest
+[ RUN      ] IdmTest.FreeFlowAcceleratesAtIdmMaxAccel
+[       OK ] IdmTest.FreeFlowAcceleratesAtIdmMaxAccel (1 ms)
+[----------] 1 test from IdmTest (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (1 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"IdmTest.FreeFlowAcceleratesAtIdmMaxAccel" end time: Oct 01 02:21 PDT
+"IdmTest.FreeFlowAcceleratesAtIdmMaxAccel" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/15 Testing: IdmTest.LeaderBrakingForcesDeceleration
+6/15 Test: IdmTest.LeaderBrakingForcesDeceleration
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=IdmTest.LeaderBrakingForcesDeceleration" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"IdmTest.LeaderBrakingForcesDeceleration" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = IdmTest.LeaderBrakingForcesDeceleration
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from IdmTest
+[ RUN      ] IdmTest.LeaderBrakingForcesDeceleration
+[       OK ] IdmTest.LeaderBrakingForcesDeceleration (2 ms)
+[----------] 1 test from IdmTest (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"IdmTest.LeaderBrakingForcesDeceleration" end time: Oct 01 02:21 PDT
+"IdmTest.LeaderBrakingForcesDeceleration" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/15 Testing: IdmTest.ConvergesToLeaderSpeedAndGap
+7/15 Test: IdmTest.ConvergesToLeaderSpeedAndGap
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=IdmTest.ConvergesToLeaderSpeedAndGap" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"IdmTest.ConvergesToLeaderSpeedAndGap" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = IdmTest.ConvergesToLeaderSpeedAndGap
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from IdmTest
+[ RUN      ] IdmTest.ConvergesToLeaderSpeedAndGap
+[       OK ] IdmTest.ConvergesToLeaderSpeedAndGap (2 ms)
+[----------] 1 test from IdmTest (2 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (2 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"IdmTest.ConvergesToLeaderSpeedAndGap" end time: Oct 01 02:21 PDT
+"IdmTest.ConvergesToLeaderSpeedAndGap" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/15 Testing: YieldTest.DistantCrossingAssertsAndHoldsSpeed
+8/15 Test: YieldTest.DistantCrossingAssertsAndHoldsSpeed
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=YieldTest.DistantCrossingAssertsAndHoldsSpeed" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"YieldTest.DistantCrossingAssertsAndHoldsSpeed" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = YieldTest.DistantCrossingAssertsAndHoldsSpeed
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from YieldTest
+[ RUN      ] YieldTest.DistantCrossingAssertsAndHoldsSpeed
+[       OK ] YieldTest.DistantCrossingAssertsAndHoldsSpeed (86 ms)
+[----------] 1 test from YieldTest (86 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (86 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.10 sec
+----------------------------------------------------------
+Test Passed.
+"YieldTest.DistantCrossingAssertsAndHoldsSpeed" end time: Oct 01 02:21 PDT
+"YieldTest.DistantCrossingAssertsAndHoldsSpeed" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/15 Testing: YieldTest.ResumesFollowAfterPedestrianClears
+9/15 Test: YieldTest.ResumesFollowAfterPedestrianClears
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=YieldTest.ResumesFollowAfterPedestrianClears" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"YieldTest.ResumesFollowAfterPedestrianClears" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = YieldTest.ResumesFollowAfterPedestrianClears
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from YieldTest
+[ RUN      ] YieldTest.ResumesFollowAfterPedestrianClears
+[       OK ] YieldTest.ResumesFollowAfterPedestrianClears (104 ms)
+[----------] 1 test from YieldTest (104 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (104 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"YieldTest.ResumesFollowAfterPedestrianClears" end time: Oct 01 02:21 PDT
+"YieldTest.ResumesFollowAfterPedestrianClears" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/15 Testing: ScenarioIoTest.MissingFileThrows
+10/15 Test: ScenarioIoTest.MissingFileThrows
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=ScenarioIoTest.MissingFileThrows" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"ScenarioIoTest.MissingFileThrows" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = ScenarioIoTest.MissingFileThrows
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ScenarioIoTest
+[ RUN      ] ScenarioIoTest.MissingFileThrows
+[       OK ] ScenarioIoTest.MissingFileThrows (0 ms)
+[----------] 1 test from ScenarioIoTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"ScenarioIoTest.MissingFileThrows" end time: Oct 01 02:21 PDT
+"ScenarioIoTest.MissingFileThrows" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/15 Testing: ScenarioIoTest.JsonlRoundtrip
+11/15 Test: ScenarioIoTest.JsonlRoundtrip
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=ScenarioIoTest.JsonlRoundtrip" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"ScenarioIoTest.JsonlRoundtrip" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = ScenarioIoTest.JsonlRoundtrip
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from ScenarioIoTest
+[ RUN      ] ScenarioIoTest.JsonlRoundtrip
+[       OK ] ScenarioIoTest.JsonlRoundtrip (196 ms)
+[----------] 1 test from ScenarioIoTest (196 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (196 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.22 sec
+----------------------------------------------------------
+Test Passed.
+"ScenarioIoTest.JsonlRoundtrip" end time: Oct 01 02:21 PDT
+"ScenarioIoTest.JsonlRoundtrip" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/15 Testing: OverrideTest.OffReproducesOriginalTrajectoryByteForByte
+12/15 Test: OverrideTest.OffReproducesOriginalTrajectoryByteForByte
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=OverrideTest.OffReproducesOriginalTrajectoryByteForByte" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"OverrideTest.OffReproducesOriginalTrajectoryByteForByte" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OverrideTest.OffReproducesOriginalTrajectoryByteForByte
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OverrideTest
+[ RUN      ] OverrideTest.OffReproducesOriginalTrajectoryByteForByte
+[       OK ] OverrideTest.OffReproducesOriginalTrajectoryByteForByte (177 ms)
+[----------] 1 test from OverrideTest (177 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (177 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.20 sec
+----------------------------------------------------------
+Test Passed.
+"OverrideTest.OffReproducesOriginalTrajectoryByteForByte" end time: Oct 01 02:21 PDT
+"OverrideTest.OffReproducesOriginalTrajectoryByteForByte" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/15 Testing: OverrideTest.ApplicableFalseWhenTtcFloorBreached
+13/15 Test: OverrideTest.ApplicableFalseWhenTtcFloorBreached
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=OverrideTest.ApplicableFalseWhenTtcFloorBreached" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"OverrideTest.ApplicableFalseWhenTtcFloorBreached" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OverrideTest.ApplicableFalseWhenTtcFloorBreached
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OverrideTest
+[ RUN      ] OverrideTest.ApplicableFalseWhenTtcFloorBreached
+[       OK ] OverrideTest.ApplicableFalseWhenTtcFloorBreached (0 ms)
+[----------] 1 test from OverrideTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (0 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"OverrideTest.ApplicableFalseWhenTtcFloorBreached" end time: Oct 01 02:21 PDT
+"OverrideTest.ApplicableFalseWhenTtcFloorBreached" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/15 Testing: OverrideTest.PedestrianBufferAlwaysVetoes
+14/15 Test: OverrideTest.PedestrianBufferAlwaysVetoes
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=OverrideTest.PedestrianBufferAlwaysVetoes" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"OverrideTest.PedestrianBufferAlwaysVetoes" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OverrideTest.PedestrianBufferAlwaysVetoes
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OverrideTest
+[ RUN      ] OverrideTest.PedestrianBufferAlwaysVetoes
+[       OK ] OverrideTest.PedestrianBufferAlwaysVetoes (10 ms)
+[----------] 1 test from OverrideTest (10 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (11 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"OverrideTest.PedestrianBufferAlwaysVetoes" end time: Oct 01 02:21 PDT
+"OverrideTest.PedestrianBufferAlwaysVetoes" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/15 Testing: OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap
+15/15 Test: OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap
+Command: "/Users/abhiramkasireddi/policy-divergence-triage/build-cov/pdt_tests" "--gtest_filter=OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap" "--gtest_also_run_disabled_tests"
+Directory: /Users/abhiramkasireddi/policy-divergence-triage/build-cov
+"OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap" start time: Oct 01 02:21 PDT
+Output:
+----------------------------------------------------------
+Running main() from /Users/abhiramkasireddi/policy-divergence-triage/build-cov/_deps/googletest-src/googletest/src/gtest_main.cc
+Note: Google Test filter = OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from OverrideTest
+[ RUN      ] OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap
+[       OK ] OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap (8 ms)
+[----------] 1 test from OverrideTest (8 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (8 ms total)
+[  PASSED  ] 1 test.
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap" end time: Oct 01 02:21 PDT
+"OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 01 02:21 PDT

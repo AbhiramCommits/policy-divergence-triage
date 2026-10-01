@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(PDT_BUILD_TESTS "Build the GoogleTest unit test suite" ON)
 option(PDT_BUILD_PYTHON "Build the pybind11 extension module pdt_core" ON)
+option(PDT_COVERAGE "Instrument pdt_core_lib and pdt_tests for gcov coverage" OFF)
 
 include(FetchContent)
 
@@ -35,6 +36,7 @@ add_library(pdt_core_lib STATIC
 )
 target_include_directories(pdt_core_lib PUBLIC cpp/include)
 target_link_libraries(pdt_core_lib PUBLIC nlohmann_json::nlohmann_json)
+set_target_properties(pdt_core_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(PDT_BUILD_PYTHON)
   FetchContent_MakeAvailable(pybind11)
@@ -49,6 +51,7 @@ if(PDT_BUILD_TESTS)
   enable_testing()
   add_executable(pdt_tests
     cpp/tests/test_planner.cpp
+    cpp/tests/test_planner_behavior.cpp
     cpp/tests/test_scenario_io.cpp
     cpp/tests/test_overrides.cpp
   )
@@ -58,4 +61,11 @@ if(PDT_BUILD_TESTS)
   )
   include(GoogleTest)
   gtest_discover_tests(pdt_tests)
+endif()
+
+if(PDT_COVERAGE)
+  foreach(tgt pdt_core_lib pdt_tests)
+    target_compile_options(${tgt} PRIVATE --coverage)
+    target_link_options(${tgt} PRIVATE --coverage)
+  endforeach()
 endif()

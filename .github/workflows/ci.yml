@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0+cpu
+          python -m pip install -r requirements-pipeline.txt
+          python -m pip install scikit-build-core==0.11.4
+          python -m pip install -e .
+
+      - name: Build C++ core and run GoogleTest
+        run: |
+          cmake -S . -B build
+          cmake --build build -j4
+          ctest --test-dir build --output-on-failure
+
+      - name: Run pytest suite
+        run: python -m pytest tests -q
+
+      - name: Fixture pipeline (train, shadow, cluster, ab, gate)
+        run: make fixture-pipeline
+
+      - name: Upload A/B report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ab-report
+          path: artifacts/fixture-pipeline/ab_report.md

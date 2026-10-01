@@ -1,0 +1,16 @@
+PlannerTest.DeterministicAcrossFixtures 3 0.124678
+PlannerTest.AccelWithinConfigBounds 3 0.0667851
+PlannerTest.YieldStopsBeforeConflictPoint 3 0.0594856
+PlannerTest.PurePursuitConvergesToCenterline 3 0.00753607
+IdmTest.FreeFlowAcceleratesAtIdmMaxAccel 3 0.00622253
+IdmTest.LeaderBrakingForcesDeceleration 3 0.00638617
+IdmTest.ConvergesToLeaderSpeedAndGap 3 0.00705197
+YieldTest.DistantCrossingAssertsAndHoldsSpeed 3 0.0348237
+YieldTest.ResumesFollowAfterPedestrianClears 3 0.0417603
+ScenarioIoTest.MissingFileThrows 3 0.00687996
+ScenarioIoTest.JsonlRoundtrip 3 0.0719429
+OverrideTest.OffReproducesOriginalTrajectoryByteForByte 3 0.0682963
+OverrideTest.ApplicableFalseWhenTtcFloorBreached 3 0.00670181
+OverrideTest.PedestrianBufferAlwaysVetoes 3 0.0108209
+OverrideTest.EarlyBrakingActivatesAndStopsAtSafeGap 3 0.0100593
+---

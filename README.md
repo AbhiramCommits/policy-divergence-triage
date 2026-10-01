@@ -1,417 +1,262 @@
 # policy-divergence-triage
 
-Replay real logged driving scenarios (Argoverse 2 Motion Forecasting) through
-both a learned ML policy and a deterministic rule-based C++ planner, then mine,
-cluster, and triage where they diverge.
+**Problem.** A production rule-based planner and a learned ML policy will
+disagree, and the disagreements are the point: some of them are the ML policy
+being good in ways the planner is not, some are the opposite. This repo replays
+real logged driving scenarios (Argoverse 2 Motion Forecasting) through both
+systems on identical initial conditions, measures where they diverge, clusters
+the divergence signatures, lets a human triage each cluster into
+desirable/undesirable/mixed, ports one desirable behavior into the production
+C++ planner as a guarded override, and gates the result with an A/B regression
+check. Neither system is tuned toward an expected result — whatever the ML
+policy does better or worse than the planner is the finding.
 
-Current state: the C++ core (`pdt_core`), the deterministic rule planner with
-guarded behavior overrides, the JSONL scenario format, the AV2 data pipeline,
-the learned ML policy, the shadow-mode replay harness, the divergence metrics,
-the DuckDB query layer, the cluster analysis, the human review CLI, the A/B
-study, and the regression gate are all implemented.
+## Architecture
+
+```mermaid
+flowchart LR
+    AV2[Argoverse 2 subset<br/>scenarios/fetch_av2.py] --> JSONL[scenarios/logs.jsonl<br/>convert_av2.py]
+    JSONL --> TRAIN[train_policy.py<br/>behavior cloning 70%]
+    JSONL --> SHADOW[pdt-shadow<br/>dual replay 30% held-out]
+    TRAIN --> ML[ML policy<br/>policy.pt]
+    SHADOW --> RULE[C++ RulePlanner<br/>pdt_core]
+    SHADOW --> ML
+    RULE --> DIV[divergence.parquet<br/>metrics.py]
+    ML --> DIV
+    DIV --> CLU[pdt-cluster<br/>persisted KMeans model]
+    CLU --> REV[pdt-review<br/>labels/cluster_labels.yaml]
+    REV --> PORT[EarlyBrakingOverride<br/>cpp/src/overrides.cpp]
+    PORT --> AB[pdt-ab<br/>OFF vs ON]
+    AB --> GATE[pdt-gate<br/>pass/fail]
+```
+
+1. **Fetch + convert**: a fixed, seeded 2,000-scenario subset of the AV2
+   Motion Forecasting VAL split (recorded in `scenarios/manifest.txt`) is
+   converted to a JSONL scenario format with ego-frame localization, traversed
+   lane centerlines, and documented tag heuristics.
+2. **Dual replay**: `pdt-shadow` runs the C++ rule planner and the ML policy on
+   identical initial conditions; other agents replay their logged tracks
+   (non-reactive) for both systems.
+3. **Metrics**: one divergence row per scenario (`divergence.parquet`).
+4. **Clustering**: divergence signatures are clustered with a persisted KMeans
+   model (silhouette-chosen k); new runs assign to existing clusters.
+5. **Triage**: `pdt-review` walks clusters and records human labels.
+6. **Port**: the highest-value `desirable` cluster is ported into the C++
+   planner as a guarded, toggleable override.
+7. **A/B + gate**: `pdt-ab` runs the suite with the override OFF then ON;
+   `pdt-gate` blocks the change on any safety regression.
 
 ## Repository layout
 
 ```
-cpp/include/pdt/   types.hpp, planner.hpp, overrides.hpp, scenario.hpp
-cpp/src/           planner.cpp (RulePlanner), overrides.cpp, scenario.cpp
-cpp/bindings/      pybind11 module `pdt_core`
-cpp/tests/         GoogleTest suite (via FetchContent)
-python/pdt/        policy.py (MLP + rollout), train_policy.py, harness.py (pdt-shadow),
-                   metrics.py, query.py (pdt-query), cluster.py (pdt-cluster),
-                   review.py (pdt-review), ab.py (pdt-ab), gate.py (pdt-gate), geom.py
-scenarios/         fetch_av2.py, convert_av2.py, manifest.txt
-labels/            cluster_labels.yaml (human-editable, version-controlled)
-gate_config.yaml   regression gate thresholds
-tests/             pytest suite + procedurally generated 20-scenario fixture for CI
-CMakeLists.txt     builds pdt_core lib, pdt_core extension, pdt_tests
-pyproject.toml     scikit-build-core packaging (pip install -e .)
-Dockerfile         Linux build + test image (Python 3.11)
-README.md / NOTICE attribution for Argoverse 2 (CC BY-NC-SA 4.0)
+cpp/                 C++17 core: planner, overrides, scenario I/O, pybind11, GoogleTests
+python/pdt/          policy.py, train_policy.py, harness.py, metrics.py, cluster.py,
+                     review.py, ab.py, gate.py, query.py, geom.py
+scenarios/           fetch_av2.py, convert_av2.py, manifest.txt (2,000 committed ids)
+tests/               pytest suite + 20-scenario procedural fixture (no AV2 downloads)
+labels/              cluster_labels.yaml (human-editable, committed)
+gate_config.yaml     regression gate thresholds
+scripts/             helper scripts (CI fixture labels)
+docs/plots/          committed cluster plots referenced by this README
+Makefile             build, test, coverage, pipeline, fixture-pipeline, ...
+Dockerfile           multi-stage image; `make pipeline` reproduces all artifacts
+docker-compose.yml   4-core pipeline runner with host artifact mounts
+.github/workflows/ci.yml  CI on ubuntu-latest
 ```
 
-## Stack
+## Reproduce
 
-C++17, CMake 3.20+, pybind11, Python 3.11, `av2` (Argoverse 2 API), numpy,
-pandas, pyarrow (Parquet), duckdb, scikit-learn, PyTorch, pytest, Docker, Linux.
-
-`pip install -e ".[pipeline]"` installs the data/ML libraries; the core build
-does not require them.
-
-## Build and test
-
-Prerequisites: a C++17 toolchain, CMake >= 3.20, Python 3.11 with dev headers,
-network access (pybind11/GoogleTest/nlohmann-json are fetched by CMake).
+Prerequisites (local): C++17 toolchain, CMake >= 3.20, Python 3.11 with dev
+headers, `pip`, `s5cmd` (for the AV2 fetch), network access.
 
 ```sh
-cmake -S . -B build && cmake --build build -j
-ctest --test-dir build --output-on-failure
-pip install -e .
+pip install -e ".[pipeline]" pytest gcovr coverage
+make build          # C++ core + pybind module + GoogleTests
+make test           # ctest (15 tests) + pytest (29 tests)
 ```
 
-Or in Docker:
+The full pipeline from scratch (downloads ~0.5 GB of AV2 data, trains the
+policy, replays 602 held-out scenarios, clusters, A/Bs, gates):
+
+```sh
+make pipeline
+```
+
+Docker (4 cores, all artifacts reproduced inside the image):
 
 ```sh
 docker build -t pdt .
+docker run --rm --cpus 4 pdt make pipeline
+docker compose up --build   # same, with host artifact mounts
 ```
 
-## Core C++ (`pdt_core`)
+Measured runtime of `docker run --rm --cpus 4 pdt make pipeline` on an Apple
+Silicon host (native Linux arm64 container, 4 cores): **76 minutes end to end**
+(AV2 subset fetch ~5 min, conversion ~4 min, 15-epoch training ~24 min, dual
+replays ~40 min, clustering/triage/AB/gate ~3 min; the gate passed). The
+pipeline is deterministic within a platform; across platforms the PyTorch side
+uses different BLAS backends, so trained-policy numbers can shift slightly and
+the target cluster can legitimately differ (the Docker run selected cluster 3
+with a 4.3 pp fixed-population drop; the committed report below is the macOS
+run).
 
-Data model (`cpp/include/pdt/types.hpp`):
+## Real results (held-out 30%, 602 scenarios, Argoverse 2 subset)
 
-- `State { t, x, y, heading, v, a }`
-- `Agent { id, type, track }`, `type` in `{vehicle, pedestrian, cyclist}`
-- `Scenario { id, tag, ego_init, agents, centerline, speed_limit, logged_ego }`;
-  `logged_ego` is the logged human-driver trajectory (ground truth for training
-  and "vs human" metrics).
-- `Trajectory { scenario_id, source, states, decisions }` — `decisions` is
-  parallel to `states` so decision flips are observable downstream.
-- `Decision { FOLLOW, YIELD, ASSERT, STOP }`
+All numbers below come from committed artifacts
+(`artifacts/per_tag_stats.csv`, `artifacts/cluster_summary.json`,
+`labels/cluster_labels.yaml`, `artifacts/ab_report.json`).
 
-### RulePlanner
+### Per-tag divergence (mean divergence score)
 
-Fixed 0.1 s step, 8.0 s horizon, fully deterministic (no randomness, no
-uninitialized state). Each step emits a decision alongside the state:
+| tag | n | mean score | max score | avg flips |
+|---|---|---|---|---|
+| lane_change | 21 | 0.7157 | 0.8883 | 36.1 |
+| left_turn | 70 | 0.6560 | 0.9106 | 41.5 |
+| lead_vehicle_braking | 200 | 0.6522 | 0.9040 | 28.8 |
+| straight_through_intersection | 86 | 0.6474 | 0.9045 | 27.8 |
+| right_turn | 72 | 0.6469 | 0.9466 | 41.3 |
+| ped_or_cyclist_interaction | 105 | 0.6431 | 0.9211 | 31.8 |
+| other | 48 | 0.6242 | 0.9017 | 17.8 |
 
-- **Lateral**: pure-pursuit centerline tracking, lookahead
-  `clamp(1.0 * v, 3.0, 15.0)` m, yaw rate `2 * v * sin(alpha) / lookahead`.
-- **Longitudinal**: IDM car-following on the nearest in-lane leader, desired
-  speed = `speed_limit`, time headway 1.6 s, minimum gap 2.0 m, max accel
-  1.5 m/s^2, comfort decel 2.0 m/s^2. Commanded accel is clamped to
-  `[-comfort_decel, max_accel]` and never leaves those bounds.
-- **Yield logic**: for each crossing agent, predict the agent forward at
-  constant velocity and find its conflict point on the ego path. Compute
-  `t_ego` and `t_agent` (times to the conflict point). If
-  `|t_ego - t_agent| < 2.0 s` the planner **yields** (decelerates to stop
-  before the conflict point, holding the yield while the conflict is pending);
-  otherwise it **asserts** (holds speed). While stopped for a pending conflict
-  the decision is `STOP`; otherwise `FOLLOW`.
-- `ASSERT` means a crossing conflict exists but the margin is large enough that
-  the planner holds its current speed instead of yielding.
+### Clusters (k = 10 by silhouette, 533 rows above the 0.5 score threshold)
 
-`PlannerConfig` carries every threshold; construct it from a Python dict:
+| id | size | signature | label |
+|---|---|---|---|
+| 1 | 149 | ML FOLLOW where rule ASSERT; ML progress +14.8 m; max lateral deviation 5.3 m | mixed |
+| 0 | 106 | ML ASSERT where rule FOLLOW; ML progress +2.3 m; max lateral deviation 8.1 m | mixed |
+| 6 | 103 | ML ASSERT where rule FOLLOW; ML progress +14.3 m; max lateral deviation 5.6 m; ML jerk −26.3 | mixed |
+| 3 | 63 | ML min TTC 1.0 s higher; ML ASSERT where rule FOLLOW; max lateral deviation 34.0 m; ML ADE −7.4 m | desirable |
+| 2 | 47 | ML min TTC 1.5 s higher; ML progress −25.9 m; ML ADE −10.1 m | desirable |
+| 4 | 35 | ML min TTC 0.6 s lower; ML progress +43.3 m; ML ADE −7.3 m | undesirable |
+| 9 | 21 | ML min TTC 13.1 s higher; ML STOP where rule FOLLOW; ML progress −22.3 m | desirable |
+| 7 | 6 | ML ASSERT where rule FOLLOW; ML progress −23.4 m; max lateral deviation 58.3 m | mixed |
+| 5 | 2 | ML progress −81.6 m; max lateral deviation 80.7 m; ML ADE +34.9 m | undesirable |
+| 8 | 1 | ML min TTC 47.9 s higher; ML STOP where rule FOLLOW | desirable |
 
-```python
-import pdt_core
-planner = pdt_core.RulePlanner(pdt_core.PlannerConfig({
-    "yield_time_margin": 1.5, "speed_limit...": ...}))
-traj = planner.plan(scenario)
-```
+Cluster plots (rule vs ML trajectories for the 5 medoid exemplars; generated by
+`pdt-review`):
 
-| Config field             | Default | Meaning                                        |
-|--------------------------|---------|------------------------------------------------|
-| `dt`                     | 0.1     | step (s)                                       |
-| `horizon`                | 8.0     | horizon (s)                                    |
-| `lookahead_gain/min/max` | 1.0/3.0/15.0 | pure-pursuit lookahead              |
-| `idm_time_headway`       | 1.6     | IDM headway (s)                                |
-| `idm_min_gap`            | 2.0     | IDM min gap (m)                                |
-| `idm_max_accel`          | 1.5     | IDM max accel (m/s^2)                          |
-| `idm_comfort_decel`      | 2.0     | comfort decel (m/s^2)                          |
-| `idm_delta`              | 4.0     | IDM exponent                                   |
-| `yield_time_margin`      | 2.0     | yield if \|t_ego - t_agent\| below this (s)    |
-| `yield_stop_buffer`      | 2.0     | stop this far before the conflict point (m)    |
-| `yield_stop_eps`         | 0.05    | min remaining distance floor for stop decel    |
-| `conflict_radius`        | 2.5     | max lateral distance for a crossing (m)        |
-| `agent_predict_horizon`  | 8.0     | constant-velocity prediction window (s)        |
-| `min_crossing_speed`     | 0.2     | ignore near-stationary agents (m/s)            |
-| `min_cross_angle`        | 0.35    | min path-crossing angle (rad)                  |
-| `ttc_min_speed`          | 1.0     | floor on ego speed in t_ego (m/s)              |
-| `stop_speed`             | 0.05    | below this the ego counts as stopped (m/s)     |
-| `vehicle_length`         | 4.5     | subtracted from leader gap (m)                 |
-| `lane_half_width`        | 2.5     | lateral window for "in-lane leader" (m)        |
+![cluster 2 — target of the port](docs/plots/cluster_02.png)
+![cluster 4 — undesirable](docs/plots/cluster_04.png)
+![cluster 9 — desirable](docs/plots/cluster_09.png)
 
-### Behavior overrides (`cpp/include/pdt/overrides.hpp`, `cpp/src/overrides.cpp`)
+### Ported override: before/after
 
-Desirable ML behavior found by the triage is ported into the production
-planner as explicit, guarded overrides implementing the `Override` interface
-(`applicable(scenario, ego, context)` + `apply(...)` -> `PlannerCommand`).
-Overrides are individually toggleable by name via `PlannerConfig.overrides`
-(default OFF), so before/after is a config flag, not a code revert.
+Target selection (data-driven): among `desirable`-labeled clusters with at
+least 10 scenarios, the one where the ML behavior removes the most rule
+collisions — **cluster 2** ("early stop-and-wait under hard lead braking").
+Ported as `EarlyBrakingOverride` in `cpp/src/overrides.cpp`: when the nearest
+forward vehicle within 5 m of the path is braking harder than −2.5 m/s^2, or is
+near-stopped within 10 m, brake early (jerk-ramped) to a 4 m stop gap and wait.
+Mandatory guards veto on predicted min TTC < 1.0 s, predicted jerk > 20 m/s^3,
+or a pedestrian within 3 m; every activation/veto is logged with its reason.
 
-- `early_braking` (ported from cluster 2, "early stop-and-wait under hard lead
-  braking"): when the nearest forward vehicle within
-  `early_brake_obstacle_lateral` m of the path is braking harder than
-  `early_brake_leader_decel_threshold`, or is near-stopped within
-  `early_brake_wait_gap`, brake early (ramped at most `override_jerk_max` per
-  step) to stop at `early_brake_stop_gap` m behind it and wait.
-- Mandatory guards (every override, non-negotiable): veto when the predicted
-  min TTC over the override profile is below `override_ttc_floor`, when
-  predicted jerk exceeds `override_jerk_max`, or when a pedestrian is inside
-  `override_pedestrian_buffer`. Every activation and veto is logged with its
-  reason and exposed as `RulePlanner.events()` (the harness writes them to
-  `artifacts/override_events.parquet`). On release, the planner ramps back to
-  the base command at `override_jerk_max` to avoid jerk spikes.
+Measured on the held-out split (`artifacts/ab_report.json`):
 
-| Config field | Default | Meaning |
+| metric | overrides OFF | overrides ON |
 |---|---|---|
-| `overrides` | `{}` (all OFF) | override name -> enabled |
-| `override_ttc_floor` | 1.0 | min predicted TTC before veto (s) |
-| `override_jerk_max` | 20.0 | max predicted jerk before veto (m/s^3) |
-| `override_pedestrian_buffer` | 3.0 | pedestrian veto distance (m) |
-| `override_predict_horizon` | 2.0 | guard prediction horizon (s) |
-| `early_brake_leader_decel_threshold` | -2.5 | hard-braking leader (m/s^2) |
-| `early_brake_max_decel` | 3.5 | override max decel (m/s^2) |
-| `early_brake_stop_gap` | 4.0 | stop gap behind the obstacle (m) |
-| `early_brake_wait_gap` | 10.0 | wait-hold range behind a slow vehicle (m) |
-| `early_brake_wait_speed` | 1.5 | below this the vehicle counts as slow (m/s) |
-| `early_brake_obstacle_lateral` | 5.0 | widened forward-obstacle corridor (m) |
+| target cluster undesirable rate (fixed population) | 0.340 | **0.289 (−5.2 pp)** |
+| target cluster rule collisions | 16 | 12 |
+| global collision count | 210 | **196** |
+| hard-brake count | 0 | 0 |
+| p95 max jerk (m/s^3) | 34.45 | 33.82 |
+| mean min TTC (s) | 1.22 | **1.44** |
+| mean progress (m) | 56.90 | 53.80 |
 
-Known limitation (measured, not fixed): collisions caused by the stitched
-centerline diverging from the actual road (obstacles > 5 m off the planned
-path) are outside any rule that sees only the planner's world model.
+Override activity: 7,301 activations, 76 vetoes (75 jerk, 1 pedestrian
+buffer). No-regression: every non-target cluster's undesirable rate fell;
+`pdt-gate` **PASS** (collision count, hard brakes, p95 jerk, per-cluster rates,
+no new clusters). The mean-progress drop is the expected cost of stop-and-wait.
 
-### Scenario format
+## How it works
 
-`scenarios/logs.jsonl`: one JSON object per line, matching `Scenario`:
+### C++ core (`pdt_core`)
 
-```json
-{"id":"00a0ffd7-...","tag":"left_turn","ego_init":{"t":0,"x":0,"y":0,"heading":0,"v":10,"a":0},
- "agents":[{"id":1,"type":"pedestrian","track":[{"t":0,"x":30,"y":4.5,"heading":-1.57,"v":1.5,"a":0},...]}],
- "centerline":[[0,0],[5,0],...],"speed_limit":11.18,"logged_ego":[{...},...]}
-```
+Data model (`cpp/include/pdt/types.hpp`): `State {t,x,y,heading,v,a}`,
+`Agent {id, type, track}`, `Scenario {id, tag, ego_init, agents, centerline,
+speed_limit, logged_ego}`, `Trajectory {scenario_id, source, states,
+decisions}`, `Decision {FOLLOW, YIELD, ASSERT, STOP}`.
 
-## Data pipeline (Argoverse 2)
+**RulePlanner** (`cpp/src/planner.cpp`): deterministic 0.1 s / 8.0 s replay.
+Lateral = pure pursuit, lookahead `clamp(1.0·v, 3, 15)` m. Longitudinal = IDM
+(headway 1.6 s, min gap 2.0 m, max accel 1.5, comfort decel 2.0 m/s^2, desired
+speed = `speed_limit`). Crossing conflicts: constant-velocity agent prediction,
+`|t_ego − t_agent| < 2.0 s` yields (stop before the conflict point), else
+assert. All thresholds live in `PlannerConfig`.
 
-AV2 data is large; the raw data and `scenarios/logs.jsonl` are gitignored.
-Only the scripts and `scenarios/manifest.txt` are committed.
+**Overrides** (`cpp/src/overrides.cpp`): the `Override` interface
+(`applicable(scenario, ego, context)` + `apply()` → `PlannerCommand`) with
+toggleable-by-name configuration (default OFF), the three non-negotiable
+guards, logged events (`RulePlanner.events()`), and a jerk-ramped release
+handoff back to the base planner.
 
-1. `scenarios/fetch_av2.py` — downloads a fixed, seeded subset of 2,000
-   scenario folders from the public bucket
-   (`s5cmd --no-sign-request` against
-   `s3://argoverse/datasets/av2/motion-forecasting/val/`). It lists the bucket
-   (metadata only), selects 2,000 folders with a fixed seed, records them in
-   `scenarios/manifest.txt`, and copies only those folders to
-   `scenarios/av2_raw/val/<id>/`.
-2. `scenarios/convert_av2.py` — converts each scenario with the `av2` API:
-   - ego = the AV (focal) track; agents = other vehicles/pedestrians/cyclists
-     (`ObjectType` -> `{vehicle, pedestrian, cyclist}`; unknown types dropped);
-   - all geometry localized to the ego frame (ego start at origin, heading 0);
-   - centerline = the lane centerline(s) the logged ego actually traversed
-     (lanes within 2.5 m of the ego track, stitched in traversal order);
-   - the logged ego track is kept as `logged_ego` (human ground truth);
-   - full logged tracks are kept for all agents (observed + future windows are
-     both real logged data, so the replay stays on ground truth);
-    - writes `scenarios/logs.jsonl` and prints the tag distribution.
+### ML policy (`python/pdt/policy.py`)
 
-Full pipeline:
+MLP (256-256) mapping flattened ego state + 6 nearest agents' relative
+pose/velocity + 10 centerline points to 40 steps x (accel, steer_rate).
+Trained by behavior cloning on the real logged human trajectories (70/30 split
+by scenario id; held-out used for all analysis). Closed-loop rollout with a
+kinematic bicycle model; decisions derived post-hoc from the speed profile +
+leader gap. Inference is deterministic.
 
-```sh
-python scenarios/fetch_av2.py                 # ~0.5 GB into scenarios/av2_raw/
-python scenarios/convert_av2.py               # -> scenarios/logs.jsonl
-python -m pdt.train_policy                    # 70% train -> artifacts/policy.pt
-pdt-shadow --scenarios scenarios/logs.jsonl   # held-out 30% -> parquet artifacts
-pdt-query --query per_tag                     # per-tag divergence table
-pdt-cluster --divergence artifacts/divergence.parquet
-pdt-review                                     # label clusters -> labels/cluster_labels.yaml
-pdt-ab                                         # overrides OFF vs ON -> artifacts/ab_report.md
-pdt-gate                                       # regression gate
-```
+### Divergence metrics (`python/pdt/metrics.py`)
 
-### Speed limits
+One row per scenario. Definitions (full derivation in the module docstring):
+lateral deviation = cross-track displacement between the trajectories;
+`final_position_gap_m` = endpoint distance; TTC = distance / closing speed vs
+every agent, min over steps; jerk = `Δa/Δt`; `decision_flip_count` = steps with
+differing decisions; hard brake = any `a < −4.0 m/s^2`; collision = any step
+within 2.0 m of an agent; ADE vs the logged human on the aligned 0.1 s grid;
+`divergence_score` = weighted tanh-normalized combination (lateral 0.20,
+position 0.15, TTC 0.10, jerk 0.10, accel 0.10, decision 0.20, ADE 0.15),
+in [0, 1].
 
-Argoverse 2 maps carry no posted speed limits. We apply a documented
-per-lane-type default taken from the ego start lane's `lane_type`:
+### Clustering, triage, A/B, gate
 
-| lane_type | speed limit (m/s) | note            |
-|-----------|-------------------|-----------------|
-| VEHICLE   | 11.18             | 25 mph, urban   |
-| BUS       | 11.18             | 25 mph          |
-| BIKE      | 6.71              | 15 mph          |
-| fallback  | 11.18             | 25 mph          |
+`pdt-cluster` standardizes the numeric metric columns (one-hot flip kind and
+tag appended unscaled), sweeps KMeans k = 3..12 by silhouette (DBSCAN eps sweep
+reported), and persists scaler + model so new runs assign to existing clusters.
+`pdt-review` walks clusters, prints signatures and ASCII rule-vs-ML plots per
+exemplar, prompts for labels, and exports PNGs. `pdt-ab` runs the held-out
+suite with the override OFF then ON and emits `ab_report.md/json`.
+`pdt-gate` fails on any safety regression per `gate_config.yaml`.
 
-### Tag heuristics (priority order, thresholds in `convert_av2.py`)
+## Testing and coverage
 
-1. `left_turn` / `right_turn`: net unwrapped heading change over the ego track
-   beyond +/- 35 deg.
-2. `lane_change`: the signed lateral offset from the nearest traversed lane
-   centerline crosses beyond +/- 1.5 m on both sides (a >= 3 m lateral shift)
-   while heading change stays below 20 deg.
-3. `ped_or_cyclist_interaction`: a pedestrian/cyclist track comes within 6.0 m
-   of the ego track.
-4. `lead_vehicle_braking`: a vehicle within 40 m ahead slows by more than
-   3.0 m/s within a 2.0 s window.
-5. `straight_through_intersection`: the ego traverses a map lane segment
-   flagged `is_intersection`.
-6. `other`.
+- GoogleTest (15 tests): planner determinism (byte-identical replans), IDM
+  bounds/convergence, yield stop-before-conflict and assert/resume behavior,
+  pure-pursuit convergence, scenario JSONL round-trip and error handling,
+  override guards (TTC-floor applicability, pedestrian veto, byte-identical
+  OFF trajectory, safe-gap stop).
+- pytest (29 tests): metric definitions (hand-computed TTC, zero-divergence
+  score, order independence), clustering (seed reproducibility, persisted-model
+  assignment without refit), review label round-trip and plots, A/B report
+  building, gate pass/fail, CLI plumbing, and one end-to-end test running the
+  20-scenario fixture through the whole pipeline asserting the gate passes.
+- Measured coverage (`make coverage`): **C++ 96%** line coverage
+  (gcovr over `cpp/src` + `cpp/include`), **Python 80%** statement coverage
+  (coverage.py over `python/pdt`).
 
-## Tests
+## Limitations (honest)
 
-`cpp/tests/` (GoogleTest, run by ctest) proves, against the committed
-20-scenario fixture in `tests/fixtures/scenarios.jsonl`:
-
-- the planner is deterministic — planning the same scenario twice produces
-  byte-identical trajectories (every state field and decision equal);
-- commanded accel never leaves `[-comfort_decel, max_accel]` on any fixture;
-- a yield always produces a stop before the conflict point
-  (`fixture_ped_00`: pedestrian crossing; the ego emits YIELD, comes to a stop
-  while the crossing is pending, and never crosses the conflict point while
-  yielding/stopped);
-- scenario JSONL round-trips through `load_scenarios`/`save_scenarios`.
-
-`tests/test_metrics.py` and `tests/test_policy.py` (pytest) cover: metrics are
-order-independent, a zero-divergence synthetic pair scores exactly 0.0, TTC
-math matches hand-computed values on a two-agent fixture, ML rollout
-determinism, and the post-hoc decision classifier.
-
-Fixtures are procedurally generated by `tests/fixtures/generate_fixtures.py`
-(pure stdlib, deterministic); CI never downloads AV2.
-
-## ML policy (`python/pdt/policy.py`)
-
-Small MLP: input = flattened ego state + the 6 nearest agents' relative
-pose/velocity + 10 centerline points ahead of the ego (ego frame); hidden
-256-256 ReLU; output = 80 values = 40 steps x (accel, steer_rate). Inference is
-deterministic (`model.eval()`, `torch.no_grad()`, fixed seed).
-
-- **Training** (`python/pdt/train_policy.py`): behavior-clones the real logged
-  human ego trajectories (`logged_ego`) from the AV2 scenarios — never a tuned
-  copy of the rule planner or hand-written expert behavior. Split by scenario
-  ID (sha256, 70% train / 30% held-out); all downstream analysis runs on the
-  held-out 30% only. Saves `artifacts/policy.pt` and logs train/val loss plus
-  open-loop ADE/FDE (`artifacts/train_log.jsonl`). Whatever the policy does
-  better or worse than the planner is the finding; neither system is tuned
-  toward an expected result.
-- **Rollout**: closed-loop, 0.1 s step, 8 s horizon, re-query the model every
-  step, apply only the first action (receding horizon), integrate with a
-  kinematic bicycle model (`wheelbase 2.8 m`, steer-angle/rate limits). Same
-  `Trajectory` shape as the C++ side.
-- **Decisions**: the same enum is derived post-hoc from the ML rollout by a
-  kinematic classifier on the speed profile + gap to the nearest in-lane leader
-  (`classify_decisions` in `policy.py`), so ML decisions are comparable to the
-  planner's.
-
-### Known limitation
-
-Other agents replay their logged tracks (non-reactive) for both systems. The
-rule planner and the ML policy do not simulate agent responses; both see the
-same frozen logged world, so divergences come from the policies themselves,
-not from differing agent behavior.
-
-## Shadow harness (`pdt-shadow`)
-
-`python/pdt/harness.py` loads scenarios via `pdt_core.load_scenarios`, then for
-each scenario runs the rule planner (pybind11) and the ML policy on identical
-initial conditions, in the same process. Scenarios are processed with
-multiprocessing over a fixed chunk order so output row order is stable. Writes:
-
-- `artifacts/trajectories.parquet` — paired trajectories, long format
-  (`scenario_id, source, step, t, x, y, heading, v, a, decision, decision_name`);
-- `artifacts/divergence.parquet` — one divergence row per scenario.
-
-```sh
-python -m pdt.train_policy --scenarios scenarios/logs.jsonl
-pdt-shadow --scenarios scenarios/logs.jsonl --checkpoint artifacts/policy.pt
-```
-
-## Divergence metrics (`python/pdt/metrics.py`)
-
-One row per scenario in `artifacts/divergence.parquet`:
-
-`scenario_id, tag, max_lateral_deviation_m, mean_lateral_deviation_m,
-final_position_gap_m, min_ttc_rule_s, min_ttc_ml_s, ttc_delta_s, max_jerk_rule,
-max_jerk_ml, jerk_delta, mean_abs_accel_rule, mean_abs_accel_ml,
-decision_flip_count, first_flip_time_s, flip_kind, completion_progress_rule_m,
-completion_progress_ml_m, hard_brake_rule, hard_brake_ml, collision_rule,
-collision_ml, ade_rule_vs_human_m, ade_ml_vs_human_m, divergence_score`
-
-Every formula (lateral deviation, TTC, jerk, ADE vs the logged human, hard
-brake at decel > 4.0 m/s^2, collision at < 2.0 m, the weighted normalized
-`divergence_score`) is documented in the `python/pdt/metrics.py` module
-docstring.
-
-## DuckDB queries (`pdt-query`)
-
-Runs SQL directly over the Parquet files (`divergence`, `trajectories` views).
-Four canned queries: top-50 divergences by score (`top50`), divergence rate per
-tag (`per_tag`), decision-flip breakdown (`flips`), hard-brake and collision
-comparison (`hard_brake`). Arbitrary SQL via `--sql`.
-
-```sh
-pdt-query --divergence artifacts/divergence.parquet --query per_tag
-pdt-query --divergence artifacts/divergence.parquet --sql "SELECT ..."
-```
-
-## Cluster analysis (`pdt-cluster`)
-
-`python/pdt/cluster.py` takes `artifacts/divergence.parquet`, filters rows
-strictly above a configurable `divergence_score` threshold (default 0.5), and
-clusters the divergence signatures. Feature vector: 9 normalized numeric
-metric columns (lateral/final-gap/TTC-delta/jerk-delta/accel-delta/flip-count/
-progress-delta/ADE-delta; NaN TTC deltas imputed as 0), a one-hot of the first
-decision flip kind (12 fixed rule/ML pairs), and a one-hot of the scenario tag
-(7 fixed tags). Numeric columns are standardized (StandardScaler); one-hots are
-appended unscaled. Both KMeans (k swept 3..12, chosen by silhouette) and DBSCAN
-(eps swept) run; the full sweep is reported and KMeans is persisted.
-
-The fitted scaler + model persist to `artifacts/cluster_model.joblib`, so new
-runs **assign** to existing clusters rather than re-fitting — cluster ids are
-only meaningful relative to the persisted model (required for the regression
-gate). Outputs: `artifacts/clusters.parquet` (scenario_id, cluster_id,
-distance_to_centroid) and `artifacts/cluster_summary.json` (per cluster: size,
-centroid in original metric units, 5 medoid exemplar scenario_ids, and an
-auto-generated human-readable signature, e.g. "ML ASSERT where rule FOLLOW;
-ML min TTC 0.6 s lower; ML progress +43.3 m").
-
-```sh
-pdt-cluster --divergence artifacts/divergence.parquet --threshold 0.5
-```
-
-## Human triage (`pdt-review`)
-
-`python/pdt/review.py` walks clusters in descending size; per cluster it
-prints the signature, centroid metrics, and an ASCII side-by-side plot of the
-rule vs ML trajectory (x-y path and speed profile) for each of the 5 medoid
-exemplars, then prompts for `label` (desirable / undesirable / mixed),
-`rationale` (required), and an optional `ported_rule_hint`. Labels persist to
-`labels/cluster_labels.yaml` (human-editable, version-controlled); re-running
-shows existing labels and only prompts for unlabeled clusters. A matplotlib
-PNG per cluster is exported to `artifacts/plots/`.
-
-```sh
-pdt-review --non-interactive --labels labels/cluster_labels.yaml   # CI / plots only
-pdt-review                                                          # interactive triage
-```
-
-The committed `labels/cluster_labels.yaml` contains proposed labels for every
-cluster from the held-out run; review and edit them before they are consumed
-by the regression gate.
-
-## A/B study (`pdt-ab`)
-
-Ports a desirable behavior into the planner and measures it. Runs the full
-held-out suite twice — baseline (overrides OFF) and candidate (overrides ON) —
-assigns both runs through the *persisted* cluster model, and emits
-`artifacts/ab_report.md` + `ab_report.json`. Target cluster selection is
-data-driven: the desirable-labeled cluster (>= 10 scenarios) where the ML
-behavior removes the most rule collisions. The report contains the
-target-cluster undesirable-rate drop (including a fixed-population comparison
-over the baseline cluster's scenario ids), a no-regression check across every
-other cluster, global safety metrics (collision count, hard-brake count, p95
-max jerk, mean progress, mean min TTC), and override activation/veto counts
-with a veto-reason breakdown.
-
-```sh
-pdt-ab --scenarios scenarios/logs.jsonl
-```
-
-Measured result (committed `artifacts/ab_report.md`, held-out 602 scenarios):
-target cluster 2 fixed-population undesirable rate 0.340 -> 0.289, global
-collisions 210 -> 196, hard brakes 0 -> 0, p95 max jerk 34.5 -> 33.8 m/s^3,
-mean min TTC 1.22 -> 1.44 s, mean progress 56.9 -> 53.8 m (the expected cost
-of stop-and-wait), 7,301 activations / 76 vetoes, no per-cluster regressions.
-
-## Regression gate (`pdt-gate`)
-
-Blocks merges when the override regresses safety. Thresholds live in
-`gate_config.yaml`. Exits non-zero when any of: collision count increased,
-hard-brake count increased beyond tolerance, p95 max jerk regressed beyond
-tolerance, any non-target cluster's undesirable rate rose beyond tolerance, or
-a new cluster appeared with size above a threshold (unmodeled behavior).
-Prints a pass/fail table naming the failed checks.
-
-```sh
-pdt-gate --report artifacts/ab_report.json --config gate_config.yaml
-```
+- **Non-reactive agents**: both systems replay other agents' logged tracks;
+  nothing reacts to the ego. Divergences come from the policies, not from
+  differing agent behavior — but also no interaction effects are modeled.
+- **Constant-velocity prediction**: the planner's yield logic predicts agents
+  at constant velocity over the horizon (the override guards use a short,
+  constant-acceleration window instead). Agents that accelerate into a
+  crossing can defeat the yield margin.
+- **Default speed limits**: AV2 maps carry no posted limits; we use documented
+  per-lane-type defaults (VEHICLE/BUS 11.18 m/s, BIKE 6.71 m/s).
+- **2,000-scenario subset**: a fixed, seeded subset of the VAL split (the
+  committed `scenarios/manifest.txt`), not the full dataset.
+- **Covariate shift**: the ML policy is cloned from human open-loop behavior
+  and evaluated closed-loop; its input distribution drifts from training. It
+  also relies on the same imperfect stitched centerlines as the planner.
+- **Map-dependent collisions**: some rule-planner collisions stem from the
+  stitched centerline diverging from the real road (obstacles > 5 m off the
+  planned path); no rule on the planner's world model can fix those, and the
+  override does not attempt to.
 
 ## License and attribution
 

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpdt_core_lib.a CMakeFiles/pdt_core_lib.dir/cpp/src/planner.cpp.o CMakeFiles/pdt_core_lib.dir/cpp/src/overrides.cpp.o CMakeFiles/pdt_core_lib.dir/cpp/src/scenario.cpp.o
+/usr/bin/ranlib libpdt_core_lib.a

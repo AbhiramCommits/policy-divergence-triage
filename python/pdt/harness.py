@@ -17,6 +17,7 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -108,6 +109,10 @@ def _run_task(task: tuple[str, int]) -> dict:
     }
 
 
+def default_workers() -> int:
+    return int(os.environ.get("PDT_WORKERS", max(1, (os.cpu_count() or 2) - 1)))
+
+
 def line_offsets(path: Path, split: str) -> list[int]:
     offsets = []
     with open(path, "rb") as f:
@@ -144,7 +149,9 @@ def run(args: argparse.Namespace) -> None:
     tasks = [(str(args.scenarios), off) for off in offsets]
     print(f"running shadow replay on {len(tasks)} scenarios (split={args.split}, workers={args.workers}, overrides={overrides or 'none'})")
 
-    ctx = mp.get_context("fork" if "fork" in mp.get_all_start_methods() else "spawn")
+    # fork is fast but deadlocks with torch's background threads (OpenMP) on
+    # Linux; fall back to spawn whenever torch has been imported.
+    ctx = mp.get_context("spawn" if "torch" in sys.modules else "fork")
     results = []
     with ctx.Pool(args.workers, initializer=_worker_init, initargs=(str(args.checkpoint), args.seed, overrides)) as pool:
         for r in pool.imap(_run_task, tasks, chunksize=1):
@@ -196,7 +203,7 @@ def main() -> None:
     parser.add_argument("--metrics-out", type=Path, default=Path("artifacts/divergence.parquet"))
     parser.add_argument("--events-out", type=Path, default=Path("artifacts/override_events.parquet"))
     parser.add_argument("--overrides", type=str, default=None, help='JSON dict, e.g. \'{"early_braking": true}\'')
-    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    parser.add_argument("--workers", type=int, default=default_workers())
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--split", choices=["held_out", "train", "all"], default="held_out")
     parser.add_argument("--limit", type=int, default=None)

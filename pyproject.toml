@@ -35,3 +35,6 @@ minimum-version = "0.10"
 cmake.args = ["-DPDT_BUILD_TESTS=OFF"]
 wheel.packages = ["python/pdt"]
 sdist.include = ["cpp/**", "tests/**", "scenarios/*.py", "scenarios/manifest.txt", "CMakeLists.txt", "NOTICE"]
+
+[tool.pytest.ini_options]
+markers = ["slow: long-running tests (fixture pipeline)"]
