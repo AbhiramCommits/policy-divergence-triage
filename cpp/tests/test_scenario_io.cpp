@@ -53,4 +53,4 @@ TEST(ScenarioIoTest, JsonlRoundtrip) {
   }
 }
 
-}  // namespace
+} // namespace

@@ -41,17 +41,21 @@ struct PlannerConfig {
   double early_brake_wait_gap = 10.0;
   double early_brake_wait_speed = 1.5;
   double early_brake_obstacle_lateral = 5.0;
+  double intersection_caution_extended_margin = 4.0;
+  double intersection_caution_stop_buffer = 5.0;
 };
 
 class RulePlanner {
- public:
+public:
   explicit RulePlanner(PlannerConfig config = {});
   Trajectory plan(const Scenario& scenario);
-  const std::vector<OverrideEvent>& events() const { return last_events_; }
+  const std::vector<OverrideEvent>& events() const {
+    return last_events_;
+  }
 
- private:
+private:
   PlannerConfig cfg_;
-  std::vector<OverrideEvent> last_events_;
+  std::vector<OverrideEvent> last_events_ = {};
 };
 
-}  // namespace pdt
+} // namespace pdt

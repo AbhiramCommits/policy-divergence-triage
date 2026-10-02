@@ -21,9 +21,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
-from pdt.policy import MLPolicy, POLICY_CFG, build_features, is_train_id, open_loop_ade_fde, scenario_arrays
+from pdt.policy import (
+    POLICY_CFG,
+    MLPolicy,
+    build_features,
+    is_train_id,
+    open_loop_ade_fde,
+    scenario_arrays,
+)
 
 DT = POLICY_CFG["dt"]
 
@@ -69,27 +76,29 @@ def run(args: argparse.Namespace) -> None:
     scenarios = load_scenario_dicts(args.scenarios)
     print(f"loaded {len(scenarios)} scenarios from {args.scenarios}")
 
-    train_scns, val_scns = [], []
+    train_scns: list[dict] = []
+    val_scns: list[dict] = []
     for sc in scenarios:
         scn = scenario_arrays(sc)
         (train_scns if is_train_id(sc["id"]) else val_scns).append(scn)
     print(f"split by scenario id: {len(train_scns)} train / {len(val_scns)} held-out")
 
-    X, Y = [], []
+    X: list[np.ndarray] = []
+    Y: list[np.ndarray] = []
     for scn in train_scns:
         n_states = len(scn["logged_ego"])
-        for t in range(0, n_states - 2 * POLICY_CFG["out_steps"] - 1):
+        for t in range(n_states - 2 * POLICY_CFG["out_steps"] - 1):
             x, y = build_sample(scn, t, POLICY_CFG)
             X.append(x)
             Y.append(y)
-    X = torch.from_numpy(np.asarray(X, dtype=np.float32))
-    Y = torch.from_numpy(np.asarray(Y, dtype=np.float32))
-    print(f"train samples: {len(X)}")
+    Xt = torch.from_numpy(np.asarray(X, dtype=np.float32))
+    Yt = torch.from_numpy(np.asarray(Y, dtype=np.float32))
+    print(f"train samples: {len(Xt)}")
 
     val_samples = []
     for scn in val_scns:
         n_states = len(scn["logged_ego"])
-        for t in range(0, n_states - 2 * POLICY_CFG["out_steps"] - 1):
+        for t in range(n_states - 2 * POLICY_CFG["out_steps"] - 1):
             val_samples.append(build_sample(scn, t, POLICY_CFG))
     if val_samples:
         Xv = torch.from_numpy(np.asarray([x for x, _ in val_samples], dtype=np.float32))
@@ -102,7 +111,7 @@ def run(args: argparse.Namespace) -> None:
     loss_fn = nn.MSELoss()
 
     gen = torch.Generator().manual_seed(args.seed)
-    dataset = torch.utils.data.TensorDataset(X, Y)
+    dataset = torch.utils.data.TensorDataset(Xt, Yt)
     loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, generator=gen)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

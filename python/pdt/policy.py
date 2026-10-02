@@ -34,9 +34,16 @@ import math
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
-from pdt.geom import agents_at_t, arc_lengths, point_at_arc, project_to_centerline, states_to_array
+from pdt.geom import (
+    agents_at_t,
+    arc_lengths,
+    interpolate_agent_grid,
+    point_at_arc,
+    project_to_centerline,
+    states_to_array,
+)
 
 POLICY_CFG: dict = {
     "input_dim": 49,
@@ -74,7 +81,7 @@ DECISION_NAMES = {FOLLOW: "FOLLOW", YIELD: "YIELD", ASSERT: "ASSERT", STOP: "STO
 class MLPolicy(nn.Module):
     def __init__(self, input_dim: int, hidden: list[int], out_dim: int):
         super().__init__()
-        layers = []
+        layers: list[nn.Module] = []
         prev = input_dim
         for h in hidden:
             layers.append(nn.Linear(prev, h))
@@ -88,16 +95,17 @@ class MLPolicy(nn.Module):
 
 
 def split_scenario_ids(ids: list[str], train_frac: float = 0.7) -> tuple[list[str], list[str]]:
-    train, held_out = [], []
+    train: list[str] = []
+    held_out: list[str] = []
     for sid in ids:
         h = int.from_bytes(hashlib.sha256(sid.encode()).digest()[:4], "big")
-        (train if h % 100 < int(round(train_frac * 100)) else held_out).append(sid)
+        (train if h % 100 < round(train_frac * 100) else held_out).append(sid)
     return train, held_out
 
 
 def is_train_id(sid: str, train_frac: float = 0.7) -> bool:
     h = int.from_bytes(hashlib.sha256(sid.encode()).digest()[:4], "big")
-    return h % 100 < int(round(train_frac * 100))
+    return h % 100 < round(train_frac * 100)
 
 
 def scenario_arrays(scenario: dict) -> dict:
@@ -112,6 +120,20 @@ def scenario_arrays(scenario: dict) -> dict:
     logged = states_to_array(scenario.get("logged_ego") or [])
     if len(logged):
         logged[:, 3] = np.unwrap(logged[:, 3])
+
+    max_t = max(8.0, float(logged[-1, 0]) if len(logged) else 8.0)
+    n_grid = round(max_t / POLICY_CFG["dt"]) + 1
+    grid_types, agents_grid = interpolate_agent_grid(tracks, np.arange(n_grid) * POLICY_CFG["dt"])
+
+    veh_idx = [i for i, t in enumerate(grid_types) if t == "vehicle"]
+    veh_s: np.ndarray | None = None
+    veh_d: np.ndarray | None = None
+    if veh_idx and len(cl) >= 2:
+        pts = agents_grid[veh_idx][:, :, :2].reshape(-1, 2)
+        s_all, d_all = project_to_centerline(pts, cl, arc_lengths(cl))
+        veh_s = s_all.reshape(len(veh_idx), n_grid)
+        veh_d = d_all.reshape(len(veh_idx), n_grid)
+
     return {
         "cl": cl,
         "cum": arc_lengths(cl),
@@ -120,7 +142,20 @@ def scenario_arrays(scenario: dict) -> dict:
         "speed_limit": float(scenario.get("speed_limit") or 0.0),
         "ego_init": scenario.get("ego_init") or {"t": 0.0, "x": 0.0, "y": 0.0, "heading": 0.0, "v": 0.0},
         "id": scenario.get("id", ""),
+        "grid_types": grid_types,
+        "agents_grid": agents_grid,
+        "veh_idx": veh_idx,
+        "veh_s": veh_s,
+        "veh_d": veh_d,
     }
+
+
+def agents_at(scn: dict, t: float, cfg: dict) -> np.ndarray:
+    grid = scn.get("agents_grid")
+    if grid is not None and len(grid):
+        tidx = min(grid.shape[1] - 1, max(0, round(t / cfg["dt"])))
+        return grid[:, tidx, :]
+    return agents_at_t(scn["tracks"], t)
 
 
 def build_features(scn: dict, state: np.ndarray, cfg: dict) -> np.ndarray:
@@ -130,7 +165,7 @@ def build_features(scn: dict, state: np.ndarray, cfg: dict) -> np.ndarray:
 
     feats = [0.0, 0.0, 0.0, v / cfg["vel_scale"], a / cfg["acc_scale"]]
 
-    ag = agents_at_t(scn["tracks"], t)
+    ag = agents_at(scn, t, cfg)
     if len(ag):
         d = ag[:, :2] - np.array([x, y])
         dx = d[:, 0] * c + d[:, 1] * s
@@ -171,7 +206,7 @@ def build_features(scn: dict, state: np.ndarray, cfg: dict) -> np.ndarray:
 def integrate_step(state: np.ndarray, accel: float, steer_rate: float, cfg: dict) -> np.ndarray:
     dt = cfg["dt"]
     L = cfg["wheelbase"]
-    t, x, y, h, v, a = state[0], state[1], state[2], state[3], state[4], state[5]
+    t, x, y, h, v = state[0], state[1], state[2], state[3], state[4]
     delta = state[6] if len(state) > 6 else 0.0
     delta = float(np.clip(delta + steer_rate * dt, -cfg["steer_angle_max"], cfg["steer_angle_max"]))
     h = h + (v / L) * math.tan(delta) * dt
@@ -183,14 +218,39 @@ def integrate_step(state: np.ndarray, accel: float, steer_rate: float, cfg: dict
 
 
 def leader_gap_at(scn: dict, state: np.ndarray, dcfg: dict) -> float:
-    x, y, h = state[1], state[2], state[3]
-    v = state[4]
+    x, y = state[1], state[2]
     cl = scn["cl"]
     if len(cl) < 2:
         return float("inf")
     s_ego, _ = project_to_centerline(np.array([[x, y]]), cl, scn["cum"])
     t = state[0]
     gap = float("inf")
+    veh_s = scn.get("veh_s")
+    veh_d = scn.get("veh_d")
+    if veh_s is not None and veh_d is not None:
+        tidx = min(veh_s.shape[1] - 1, max(0, round(t / dcfg.get("dt", 0.1))))
+        for j in range(veh_s.shape[0]):
+            s_v = veh_s[j, tidx]
+            d_v = veh_d[j, tidx]
+            if d_v > dcfg["lane_half_width"] or s_v <= s_ego[0]:
+                continue
+            g = s_v - s_ego[0] - dcfg["vehicle_length"]
+            gap = min(gap, g)
+        return gap
+    if scn.get("agents_grid") is not None and len(scn["agents_grid"]):
+        grid = scn["agents_grid"]
+        types = scn["grid_types"]
+        tidx = min(grid.shape[1] - 1, max(0, round(t / dcfg.get("dt", 0.1))))
+        sts = grid[:, tidx, :]
+        for typ, st in zip(types, sts):
+            if typ != "vehicle":
+                continue
+            s_v, d_v = project_to_centerline(np.array([[st[0], st[1]]]), cl, scn["cum"])
+            if d_v[0] > dcfg["lane_half_width"] or s_v[0] <= s_ego[0]:
+                continue
+            g = s_v[0] - s_ego[0] - dcfg["vehicle_length"]
+            gap = min(gap, g)
+        return gap
     for typ, tr in scn["tracks"]:
         if typ != "vehicle":
             continue
@@ -242,7 +302,7 @@ def rollout(scenario: dict, model: nn.Module, cfg: dict, seed: int, n_steps: int
     scn = scenario_arrays(scenario)
     ei = scenario["ego_init"]
     state = np.array([ei["t"], ei["x"], ei["y"], ei["heading"], max(0.0, ei["v"]), 0.0, 0.0], dtype=float)
-    states = [state.copy()]
+    states_arr = [state.copy()]
     with torch.no_grad():
         for _ in range(n_steps):
             f = build_features(scn, state, cfg)
@@ -252,8 +312,8 @@ def rollout(scenario: dict, model: nn.Module, cfg: dict, seed: int, n_steps: int
             a = float(np.clip(a, cfg["accel_min"], cfg["accel_max"]))
             sr = float(np.clip(sr, -cfg["steer_rate_max"], cfg["steer_rate_max"]))
             state = integrate_step(state, a, sr, cfg)
-            states.append(state.copy())
-    states = np.asarray(states)
+            states_arr.append(state.copy())
+    states = np.asarray(states_arr)
     decisions = classify_decisions(states, scn)
     return states[:, :6], decisions
 

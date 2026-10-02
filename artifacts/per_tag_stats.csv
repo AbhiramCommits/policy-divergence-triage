@@ -1,8 +1,8 @@
 tag,n,mean_score,max_score,avg_flips
-lane_change,21,0.7157,0.8883,36.14
-left_turn,70,0.656,0.9106,41.49
-lead_vehicle_braking,200,0.6522,0.904,28.78
-straight_through_intersection,86,0.6474,0.9045,27.76
-right_turn,72,0.6469,0.9466,41.26
-ped_or_cyclist_interaction,105,0.6431,0.9211,31.79
-other,48,0.6242,0.9017,17.75
+left_turn,348,0.6772,0.9687,30.57
+lane_change,83,0.6643,0.8845,16.45
+right_turn,325,0.6544,0.9442,17.84
+straight_through_intersection,474,0.6415,0.9726,14.09
+lead_vehicle_braking,961,0.6405,0.9826,15.05
+other,186,0.635,0.9419,16.05
+ped_or_cyclist_interaction,550,0.6306,0.979,17.1

@@ -8,8 +8,8 @@ cluster model, and emits artifacts/ab_report.md + ab_report.json.
 
 Target cluster selection (documented, data-driven): among clusters labeled
 `desirable` in labels/cluster_labels.yaml with at least `min_target_size`
-scenarios, pick the one where the ML behavior removes the most rule collisions
-(before-run collision_rule count - collision_ml count), tie-broken by size.
+scenarios, pick the one whose ML behavior improves safety the most, measured as
+the mean min-TTC delta (min_ttc_ml - min_ttc_rule), tie-broken by size.
 
 Per-cluster undesirable rate: fraction of scenarios in the cluster flagged
 unsafe for the RULE planner (collision_rule OR hard_brake_rule).
@@ -64,19 +64,22 @@ def per_cluster(d: pd.DataFrame, labels: np.ndarray) -> dict[int, dict]:
     for cid in sorted(set(labels)):
         idx = np.where(labels == cid)[0]
         g = d.iloc[idx]
+        ttc_delta = (g["min_ttc_ml_s"] - g["min_ttc_rule_s"])
+        ttc_delta_mean = float(ttc_delta[ttc_delta.notna()].mean()) if ttc_delta.notna().any() else 0.0
         out[int(cid)] = {
             "size": int(len(g)),
             "undesirable": int((g["collision_rule"] | g["hard_brake_rule"]).sum()),
             "undesirable_rate": undesirable_rate(g),
             "collisions_rule": int(g["collision_rule"].sum()),
             "collisions_ml": int(g["collision_ml"].sum()),
+            "ttc_delta_mean_s": ttc_delta_mean,
         }
     return out
 
 
 def global_metrics(d: pd.DataFrame) -> dict:
     return {
-        "n_rows": int(len(d)),
+        "n_rows": len(d),
         "collisions": int(d["collision_rule"].sum()),
         "hard_brakes": int(d["hard_brake_rule"].sum()),
         "jerk_p95": float(np.percentile(d["max_jerk_rule"], 95)),
@@ -85,29 +88,33 @@ def global_metrics(d: pd.DataFrame) -> dict:
     }
 
 
-def select_target(before: dict[int, dict], labels: dict, min_size: int = MIN_TARGET_SIZE) -> int | None:
+def select_target(per_before: dict[int, dict], labels: dict, min_size: int = MIN_TARGET_SIZE) -> int | None:
+    """Highest-value desirable cluster: among desirable-labeled clusters with
+    at least min_size scenarios, the one whose ML behavior improves safety the
+    most, measured as the mean min-TTC delta (min_ttc_ml - min_ttc_rule),
+    tie-broken by size."""
     candidates = []
     for cid, entry in labels.get("clusters", {}).items():
         if entry.get("label") != "desirable":
             continue
-        b = before.get(cid)
+        b = per_before.get(cid)
         if b is None or b["size"] < min_size:
             continue
-        candidates.append((b["collisions_rule"] - b["collisions_ml"], -b["size"], cid))
+        candidates.append((b["ttc_delta_mean_s"], b["size"], cid))
     if not candidates:
         return None
     candidates.sort(reverse=True)
     return int(candidates[0][2])
 
 
-def build_report(before: dict[int, dict], after: dict[int, dict], glob_before: dict, glob_after: dict,
-                 labels: dict, target: int, override_name: str, events: pd.DataFrame) -> dict:
+def build_report(per_before: dict[int, dict], per_after: dict[int, dict], glob_before: dict, glob_after: dict,
+                 labels: dict, target: int, override_names: list[str], events: pd.DataFrame) -> dict:
     no_regression = []
     for cid, entry in labels.get("clusters", {}).items():
         if cid == target:
             continue
-        b = before.get(cid)
-        a = after.get(cid)
+        b = per_before.get(cid)
+        a = per_after.get(cid)
         if b is None or a is None or b["size"] == 0 or a["size"] == 0:
             continue
         delta = a["undesirable_rate"] - b["undesirable_rate"]
@@ -122,27 +129,29 @@ def build_report(before: dict[int, dict], after: dict[int, dict], glob_before: d
         })
     no_regression.sort(key=lambda r: -abs(r["delta"]))
 
-    veto_reasons = {}
+    stats = {}
     if len(events):
-        ev = events[events["name"] == override_name]
-        veto_reasons = {k: int(v) for k, v in ev[~ev["active"]]["reason"].value_counts().items()}
+        for name in override_names:
+            ev = events[events["name"] == name]
+            veto_reasons = {k: int(v) for k, v in ev[~ev["active"]]["reason"].value_counts().items()}
+            stats[name] = {
+                "activations": int(ev["active"].sum()),
+                "vetoes": int((~ev["active"]).sum()),
+                "veto_reasons": veto_reasons,
+            }
     return {
         "target_cluster": target,
-        "override": override_name,
-        "before": {"clusters": before, "global": glob_before},
-        "after": {"clusters": after, "global": glob_after},
+        "overrides": override_names,
+        "before": {"clusters": per_before, "global": glob_before},
+        "after": {"clusters": per_after, "global": glob_after},
         "headline": {
-            "undesirable_rate_before": before[target]["undesirable_rate"],
-            "undesirable_rate_after": after[target]["undesirable_rate"],
-            "drop_pp": before[target]["undesirable_rate"] - after[target]["undesirable_rate"],
-            "collisions_before": before[target]["collisions_rule"],
-            "collisions_after": after[target]["collisions_rule"],
+            "undesirable_rate_before": per_before[target]["undesirable_rate"],
+            "undesirable_rate_after": per_after[target]["undesirable_rate"],
+            "drop_pp": per_before[target]["undesirable_rate"] - per_after[target]["undesirable_rate"],
+            "collisions_before": per_before[target]["collisions_rule"],
+            "collisions_after": per_after[target]["collisions_rule"],
         },
-        "override_stats": {
-            "activations": int((events["active"] & (events["name"] == override_name)).sum()) if len(events) else 0,
-            "vetoes": int((~events["active"] & (events["name"] == override_name)).sum()) if len(events) else 0,
-            "veto_reasons": veto_reasons,
-        },
+        "override_stats": stats,
         "no_regression": no_regression,
     }
 
@@ -150,18 +159,26 @@ def build_report(before: dict[int, dict], after: dict[int, dict], glob_before: d
 def render_md(report: dict) -> str:
     h = report["headline"]
     lines = [
-        "# A/B report: `{}` override".format(report["override"]),
+        "# A/B report: `{}`".format(", ".join(report["overrides"])),
         "",
         f"Target cluster: **{report['target_cluster']}** (desirable).",
         "",
         "## Headline",
         "",
-        f"- target-cluster undesirable rate: {h['undesirable_rate_before']:.3f} -> {h['undesirable_rate_after']:.3f} "
-        f"(drop of **{h['drop_pp'] * 100:.1f} pp** over the scenarios still assigned to the cluster)",
-        f"- fixed-population rate (before-cluster scenario ids): {h['undesirable_rate_before']:.3f} -> "
-        f"{h['fixed_population_undesirable_rate_after']:.3f} (drop of **{h['drop_pp_fixed_population'] * 100:.1f} pp**)",
-        f"- target-cluster rule collisions: {h['collisions_before']} -> {h['collisions_after']} "
-        f"(fixed population: {h['fixed_population_collisions_after']})",
+        (
+            f"- target-cluster undesirable rate: {h['undesirable_rate_before']:.3f} -> "
+            f"{h['undesirable_rate_after']:.3f} (drop of **{h['drop_pp'] * 100:.1f} pp** over the "
+            "scenarios still assigned to the cluster)"
+        ),
+        (
+            f"- fixed-population rate (before-cluster scenario ids): {h['undesirable_rate_before']:.3f} -> "
+            f"{h['fixed_population_undesirable_rate_after']:.3f} "
+            f"(drop of **{h['drop_pp_fixed_population'] * 100:.1f} pp**)"
+        ),
+        (
+            f"- target-cluster rule collisions: {h['collisions_before']} -> {h['collisions_after']} "
+            f"(fixed population: {h['fixed_population_collisions_after']})"
+        ),
         "",
         "## Global safety metrics (rule planner, held-out split)",
         "",
@@ -196,9 +213,15 @@ def render_md(report: dict) -> str:
         "",
         "## Override stats",
         "",
-        f"- activations: {report['override_stats']['activations']}",
-        f"- vetoes: {report['override_stats']['vetoes']}",
-        f"- veto reasons: {report['override_stats']['veto_reasons']}",
+    ]
+    for name, st in report["override_stats"].items():
+        lines += [
+            (
+                f"- {name}: activations {st['activations']}, vetoes {st['vetoes']}, "
+                f"veto reasons {st['veto_reasons']}"
+            ),
+        ]
+    lines += [
         "",
         "## No-regression check (non-target clusters)",
         "",
@@ -231,13 +254,13 @@ def run_shadow_subprocess(overrides_json: str | None, out_dir: Path, args: argpa
         cmd += ["--overrides", overrides_json]
     if args.limit:
         cmd += ["--limit", str(args.limit)]
-    proc = subprocess.run(cmd)
+    proc = subprocess.run(cmd, check=False)
     if proc.returncode != 0:
         raise SystemExit(f"harness run failed with exit code {proc.returncode}")
 
 
 def build_report_from_runs(a_dir: Path, b_dir: Path, model_path: Path, labels: dict,
-                           override_name: str, min_target_size: int = MIN_TARGET_SIZE) -> dict:
+                           override_names: list[str], min_target_size: int = MIN_TARGET_SIZE) -> dict:
     div_before = pd.read_parquet(a_dir / "divergence.parquet")
     div_after = pd.read_parquet(b_dir / "divergence.parquet")
     d_before, labels_before = assign_through_model(Path(model_path), div_before)
@@ -257,7 +280,7 @@ def build_report_from_runs(a_dir: Path, b_dir: Path, model_path: Path, labels: d
 
     events = pd.read_parquet(b_dir / "override_events.parquet")
     report = build_report(per_before, per_after, global_metrics(d_before), global_metrics(d_after),
-                          labels, target, override_name, events)
+                          labels, target, override_names, events)
     report["cluster_labels"] = {cid: (labels["clusters"].get(cid) or {}).get("label") for cid in
                                 set(per_before) | set(per_after)}
     report["headline"]["fixed_population_undesirable_rate_after"] = fixed_rate_after
@@ -291,9 +314,9 @@ def run_ab(args: argparse.Namespace) -> dict:
             print("=== run A: baseline (overrides OFF) ===")
             run_shadow_subprocess(None, a_dir, args)
         print("=== run B: candidate (override ON) ===")
-        run_shadow_subprocess(json.dumps({args.override: True}), b_dir, args)
+        run_shadow_subprocess(json.dumps(args.overrides_dict), b_dir, args)
 
-    report = build_report_from_runs(a_dir, b_dir, Path(args.model), labels, args.override,
+    report = build_report_from_runs(a_dir, b_dir, Path(args.model), labels, sorted(args.overrides_dict),
                                     min_target_size=args.min_target_size)
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -313,7 +336,10 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, default=Path("artifacts/policy.pt"))
     parser.add_argument("--model", type=Path, default=Path("artifacts/cluster_model.joblib"))
     parser.add_argument("--labels", type=Path, default=Path("labels/cluster_labels.yaml"))
-    parser.add_argument("--override", type=str, default="early_braking")
+    parser.add_argument("--override", type=str, default=None,
+                        help="single override name (shorthand for --overrides)")
+    parser.add_argument("--overrides", type=str, default=None,
+                        help='JSON dict of overrides, e.g. \'{"early_braking": true, "intersection_caution": true}\'')
     parser.add_argument("--out-dir", type=Path, default=Path("artifacts"))
     parser.add_argument("--min-target-size", type=int, default=MIN_TARGET_SIZE)
     parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
@@ -326,6 +352,12 @@ def main() -> None:
     parser.add_argument("--baseline-events", type=Path, default=None,
                         help="override events parquet matching --baseline-divergence")
     args = parser.parse_args()
+    if args.overrides:
+        args.overrides_dict = json.loads(args.overrides)
+    elif args.override:
+        args.overrides_dict = {args.override: True}
+    else:
+        args.overrides_dict = {"early_braking": True, "intersection_caution": True}
     run_ab(args)
 
 

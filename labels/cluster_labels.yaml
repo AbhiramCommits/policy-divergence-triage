@@ -8,71 +8,36 @@ version: 1
 clusters:
   '0':
     label: mixed
-    rationale: ML holds speed where the rule follows; mean min TTC edges up 1.25 ->
-      1.38 s and ADE vs the human is unchanged (8.0 vs 8.3 m), but collision flags
-      rise 26 -> 38 and ML wanders up to 8.1 m laterally from the rule's centerline
-      path.
-    ported_rule_hint: 'rule: no change; investigate ML lane-keeping (8.1 m mean lateral
-      gap) for an off-route guard'
+    rationale: The rule planner deviates up to 62.8 m from the human path (ADE 30.1
+      m vs ML 10.8 m) on broken stitched centerlines; ML tracks the human far better
+      but has 18 more collision flags (56 -> 74).
+    ported_rule_hint: 'rule: improve centerline stitching quality; this cluster is
+      map-limited, not policy-limited'
   '1':
     label: mixed
-    rationale: ML tracks the human more closely (ADE 8.7 -> 6.7 m) and covers +14.8
-      m more route, but collision flags rise 49 -> 67 and mean min TTC drops 1.65
-      -> 1.29 s; progress is bought with safety margin.
-    ported_rule_hint: 'rule: keep yield gating; do not port ML''s closer passes until
-      min-TTC is addressed'
+    rationale: 'ML proceeds where the rule asserts: +13.4 m progress, ADE 9.4 -> 6.6
+      m, and slightly higher mean min TTC (1.64 -> 1.70 s), but collision flags rise
+      173 -> 214.'
+    ported_rule_hint: null
   '2':
     label: desirable
-    rationale: ML matches the human far better (ADE 14.4 -> 4.3 m), more than doubles
-      mean min TTC (0.84 -> 2.38 s) and has fewer collision flags (16 -> 12); it covers
-      25.9 m less route because it stops/slows where the human did and the rule planner
-      did not.
-    ported_rule_hint: 'rule: port ML-style early stop-and-wait in lead-braking scenes'
+    rationale: 'ML brakes earlier and waits behind lead vehicles: mean min TTC 1.56
+      -> 2.57 s over 1,184 scenarios, ADE vs the human 10.7 -> 6.8 m, at a cost of
+      8.9 m progress. Caveat: ML collision flags are slightly higher (291 -> 325),
+      so the ported override must lower the undesirable rate without inheriting that.'
+    ported_rule_hint: 'rule: port ML-style early stop-and-wait behind braking or slow
+      forward vehicles'
   '3':
-    label: desirable
-    rationale: ML hugs the human path (ADE 16.6 -> 9.3 m) and raises mean min TTC
-      0.82 -> 1.78 s with collision flags essentially unchanged (28 vs 27); the 34
-      m rule-vs-ML lateral gap mostly reflects the rule hugging the stitched centerline
-      where the human deviates.
-    ported_rule_hint: 'rule: relax pure-pursuit centerline tracking where the human
-      cuts turns'
-  '4':
     label: undesirable
-    rationale: 'ML charges through where the rule holds back: +43.3 m progress and
-      ADE 14.2 -> 6.9 m, but mean min TTC collapses 1.05 -> 0.46 s and collision flags
-      rise 15 -> 23; the progress is bought with safety margin.'
+    rationale: 'ML charges through where the rule holds back: +23.9 m progress and
+      much smoother control (max jerk 25.0 -> 3.8 m/s^3), but mean min TTC drops 0.93
+      -> 0.68 s and collision flags rise 608 -> 676; the progress is bought with safety
+      margin.'
     ported_rule_hint: 'rule: keep current yield/IDM gating; gate any ML-style progress
       behind a min-TTC check'
-  '5':
-    label: undesirable
-    rationale: In 2 scenarios ML leaves the route entirely (mean lateral gap 80.7
-      m, ADE vs human 46.8 vs 11.9 m) and completes less than half the route (75.5
-      vs 157.1 m); the higher TTC (2.12 vs 0.93 s) comes from not proceeding at all.
-    ported_rule_hint: 'ml: add off-route guard / centerline-dropout handling'
-  '6':
-    label: mixed
-    rationale: ML is far smoother (max jerk 29.5 -> 3.2 m/s^3, ADE 8.1 -> 7.0 m) and
-      gains +14.3 m progress, but collision flags rise 70 -> 79 and mean min TTC halves
-      from 1.00 to 0.59 s.
-    ported_rule_hint: 'rule: port ML''s smoother braking profile without its lower
-      TTC'
-  '7':
-    label: mixed
-    rationale: In dense lead-braking scenes both systems are unsafe (mean min TTC
-      ~0.35 s); ML tracks the human far better (ADE 54.6 -> 18.9 m) and stops 23.4
-      m shorter, but adds one more collision flag (3 -> 4).
-    ported_rule_hint: null
-  '8':
+  '4':
     label: desirable
-    rationale: In one straight-through-intersection scene the rule planner drives
-      into an agent (1 collision flag, min TTC 0.21 s) while the ML policy stops after
-      4 m and waits (min TTC 48 s, no collision); conservative refusal beats unsafe
+    rationale: In one left-turn scenario the ML refuses to proceed (0.0 m progress,
+      min TTC 1255 s) where the rule drives 7.2 m; conservative refusal beats unsafe
       progress.
-    ported_rule_hint: 'rule: port ML''s refusal-to-enter behavior at this intersection'
-  '9':
-    label: desirable
-    rationale: 'ML comes to a stop where the rule drives through intersections: mean
-      min TTC 1.78 -> 14.9 s, zero collision flags vs 2, and ADE 13.5 -> 8.2 m; it
-      sacrifices 22.3 m of route progress for the caution.'
-    ported_rule_hint: 'rule: port ML''s intersection caution (stop-and-wait when cross
-      traffic is dense)'
+    ported_rule_hint: 'rule: port ML''s refusal-to-enter behavior at this turn'

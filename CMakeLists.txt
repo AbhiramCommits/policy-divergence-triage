@@ -33,6 +33,7 @@ add_library(pdt_core_lib STATIC
   cpp/src/planner.cpp
   cpp/src/overrides.cpp
   cpp/src/scenario.cpp
+  cpp/src/spatial.cpp
 )
 target_include_directories(pdt_core_lib PUBLIC cpp/include)
 target_link_libraries(pdt_core_lib PUBLIC nlohmann_json::nlohmann_json)

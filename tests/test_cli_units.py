@@ -6,11 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
-
 import pdt_core
-
-from pdt.ab import assign_through_model, render_md
+import pytest
+from pdt.ab import render_md
 from pdt.harness import line_offsets, scenario_from_dict, state_from_dict
 from pdt.metrics import compute_metrics_row
 from pdt.query import CANNED_QUERIES, connect
@@ -38,7 +36,7 @@ def test_query_connect_and_canned_queries(tmp_path):
 
 
 def test_harness_state_and_scenario_roundtrip():
-    d = json.loads(open(FIXTURES).readline())
+    d = json.loads(FIXTURES.read_text().splitlines()[0])
     sc = scenario_from_dict(d)
     assert sc.id == d["id"]
     assert sc.tag == d["tag"]
@@ -62,7 +60,7 @@ def test_harness_line_offsets_split():
 
 
 def test_review_render_exemplar_contains_both_grids():
-    d = json.loads(open(FIXTURES).readline())
+    d = json.loads(FIXTURES.read_text().splitlines()[0])
     sc = scenario_from_dict(d)
     traj = pdt_core.RulePlanner().plan(sc)
     n = len(traj.states)
@@ -126,7 +124,7 @@ def test_metrics_human_ade_aligned():
 
 def test_ab_render_md(tmp_path):
     report = {
-        "override": "early_braking",
+        "overrides": ["early_braking", "intersection_caution"],
         "target_cluster": 2,
         "before": {"global": {"collisions": 5, "hard_brakes": 0, "jerk_p95": 30.0,
                               "mean_progress_m": 50.0, "mean_min_ttc_s": 1.0},
@@ -138,7 +136,10 @@ def test_ab_render_md(tmp_path):
                      "drop_pp": 0.25, "collisions_before": 5, "collisions_after": 2,
                      "fixed_population_undesirable_rate_after": 0.25,
                      "fixed_population_collisions_after": 2, "drop_pp_fixed_population": 0.25},
-        "override_stats": {"activations": 3, "vetoes": 1, "veto_reasons": {"veto_jerk": 1}},
+        "override_stats": {
+            "early_braking": {"activations": 3, "vetoes": 1, "veto_reasons": {"veto_jerk": 1}},
+            "intersection_caution": {"activations": 1, "vetoes": 0, "veto_reasons": {}},
+        },
         "no_regression": [],
         "cluster_labels": {2: "desirable"},
     }
@@ -146,3 +147,4 @@ def test_ab_render_md(tmp_path):
     assert "# A/B report" in md
     assert "25.0 pp" in md
     assert "early_braking" in md
+    assert "intersection_caution" in md

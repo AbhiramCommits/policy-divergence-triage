@@ -65,7 +65,7 @@ import math
 
 import numpy as np
 
-from pdt.geom import agent_state_at, arc_lengths, project_to_centerline, states_to_array
+from pdt.geom import arc_lengths, interpolate_agent_grid, project_to_centerline, states_to_array
 
 DT = 0.1
 COLLISION_RADIUS_M = 2.0
@@ -113,18 +113,16 @@ def min_ttc_at_step(ego_state: np.ndarray, agent_states: np.ndarray) -> float:
     return float(ttc.min())
 
 
-def _ttc_and_collisions(states: np.ndarray, tracks: list[tuple[str, np.ndarray]]) -> tuple[float, bool]:
+def _ttc_and_collisions(states: np.ndarray, tracks: list[tuple[str, np.ndarray]],
+                        times: np.ndarray, agents_grid: np.ndarray | None) -> tuple[float, bool]:
     ttc_min = float("inf")
     collision = False
-    for st in states:
-        agents = []
-        for _typ, tr in tracks:
-            s = agent_state_at(tr, st[0])
-            if s is not None:
-                agents.append(s)
-        if not agents:
-            continue
-        ag = np.asarray(agents, dtype=float)
+    if agents_grid is None:
+        agents_grid = interpolate_agent_grid(tracks, times)[1]
+    if agents_grid.shape[0] == 0:
+        return ttc_min, collision
+    for i, st in enumerate(states):
+        ag = agents_grid[:, i, :]
         d = np.linalg.norm(ag[:, :2] - st[1:3], axis=1)
         if d.min() < COLLISION_RADIUS_M:
             collision = True
@@ -148,7 +146,6 @@ def compute_metrics_row(scenario: dict, rule: dict, ml: dict) -> dict:
     n = min(len(R), len(M))
 
     th = R[:, 3]
-    u = np.column_stack([np.cos(th), np.sin(th)])
     nrm = np.column_stack([-np.sin(th), np.cos(th)])
     e = M[:n, 1:3] - R[:n, 1:3]
     cross = (e * nrm).sum(axis=1)
@@ -165,9 +162,11 @@ def compute_metrics_row(scenario: dict, rule: dict, ml: dict) -> dict:
             continue
         tr[:, 3] = np.unwrap(tr[:, 3])
         tracks.append((a["type"], tr))
+    times = R[:n, 0]
+    agents_grid = interpolate_agent_grid(tracks, times)[1]
 
-    ttc_rule, collision_rule = _ttc_and_collisions(R[:n], tracks)
-    ttc_ml, collision_ml = _ttc_and_collisions(M[:n], tracks)
+    ttc_rule, collision_rule = _ttc_and_collisions(R[:n], tracks, times, agents_grid)
+    ttc_ml, collision_ml = _ttc_and_collisions(M[:n], tracks, times, agents_grid)
     ttc_delta = (ttc_ml - ttc_rule) if math.isfinite(ttc_rule) and math.isfinite(ttc_ml) else float("nan")
 
     def max_jerk(X: np.ndarray) -> float:

@@ -17,7 +17,7 @@ struct State {
 
 struct Agent {
   int id = 0;
-  std::string type;  // vehicle | pedestrian | cyclist
+  std::string type; // vehicle | pedestrian | cyclist
   std::vector<State> track;
 };
 
@@ -40,4 +40,4 @@ struct Trajectory {
   std::vector<Decision> decisions;
 };
 
-}  // namespace pdt
+} // namespace pdt

@@ -1,11 +1,13 @@
 PYTHON ?= $(shell command -v python3.11 >/dev/null 2>&1 && echo python3.11 || echo python3)
 BUILD_DIR ?= build
+SYSROOT_FLAGS := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "--extra-arg=-isysroot --extra-arg=$$(xcrun --show-sdk-path)"; fi)
+LLVM_ENV := $(shell if [ -d /opt/homebrew/opt/llvm/bin ]; then echo "PATH=/opt/homebrew/opt/llvm/bin:\$$PATH"; fi)
 
-.PHONY: build test test-cpp test-python coverage scenarios train shadow metrics cluster \
+.PHONY: build test test-cpp test-python coverage lint scenarios train shadow metrics cluster \
         review ab gate pipeline fixture-pipeline clean
 
 build:
-	cmake -S . -B $(BUILD_DIR)
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 	cmake --build $(BUILD_DIR) -j
 
 test: test-cpp test-python
@@ -15,6 +17,12 @@ test-cpp: build
 
 test-python:
 	$(PYTHON) -m pytest tests -q
+
+lint:
+	$(LLVM_ENV) clang-format --dry-run --Werror $$(find cpp -name '*.cpp' -o -name '*.hpp')
+	$(LLVM_ENV) clang-tidy -p $(BUILD_DIR) $(SYSROOT_FLAGS) --warnings-as-errors='*' cpp/src/*.cpp
+	$(PYTHON) -m ruff check python scenarios scripts tests
+	$(PYTHON) -m mypy python/pdt
 
 coverage:
 	cmake -S . -B build-cov -DPDT_COVERAGE=ON -DPDT_BUILD_PYTHON=OFF

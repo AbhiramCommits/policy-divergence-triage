@@ -15,6 +15,8 @@
 
 namespace {
 
+constexpr double kPi = 3.14159265358979323846;
+
 pdt::State st(double t, double x, double y, double h, double v, double a) {
   pdt::State s;
   s.t = t;
@@ -32,7 +34,8 @@ pdt::Scenario straight_scenario(std::vector<pdt::Agent> agents) {
   sc.tag = "other";
   sc.ego_init = st(0.0, 0.0, 0.0, 0.0, 10.0, 0.0);
   sc.agents = std::move(agents);
-  for (int i = 0; i <= 60; ++i) sc.centerline.push_back({static_cast<double>(i), 0.0});
+  for (int i = 0; i <= 60; ++i)
+    sc.centerline.push_back({static_cast<double>(i), 0.0});
   sc.speed_limit = 11.18;
   sc.logged_ego = {sc.ego_init};
   return sc;
@@ -94,16 +97,73 @@ pdt::Context make_context(double leader_gap, double leader_v, double leader_a) {
 std::unique_ptr<pdt::Override> get_override(const pdt::PlannerConfig& cfg, const std::string& name) {
   auto ovs = pdt::make_overrides(cfg);
   for (auto& ov : ovs) {
-    if (ov->name() == name) return std::move(ov);
+    if (ov->name() == name)
+      return std::move(ov);
   }
   return nullptr;
 }
 
 bool has_event(const pdt::RulePlanner& planner, bool active, const std::string& reason_substr) {
   for (const auto& e : planner.events()) {
-    if (e.active == active && e.reason.find(reason_substr) != std::string::npos) return true;
+    if (e.active == active && e.reason.find(reason_substr) != std::string::npos)
+      return true;
   }
   return false;
+}
+
+pdt::Agent straight_vehicle(int id, double x0, double y0, double v, double heading) {
+  pdt::Agent ag;
+  ag.id = id;
+  ag.type = "vehicle";
+  for (int i = 0; i <= 80; ++i) {
+    const double t = i * 0.1;
+    ag.track.push_back(st(t, x0 + v * std::cos(heading) * t, y0 + v * std::sin(heading) * t, heading, v, 0.0));
+  }
+  return ag;
+}
+
+TEST(OverrideTest, IntersectionCautionStopsWhereBaseAsserts) {
+  const auto sc = straight_scenario({straight_vehicle(1, 40.0, -50.0, 8.0, kPi / 2)});
+
+  const auto base = pdt::RulePlanner().plan(sc);
+  EXPECT_EQ(base.decisions[0], pdt::Decision::ASSERT);
+
+  pdt::PlannerConfig cfg;
+  cfg.overrides["intersection_caution"] = true;
+  pdt::RulePlanner planner(cfg);
+  const auto traj = planner.plan(sc);
+  EXPECT_TRUE(has_event(planner, true, "activated"));
+
+  double min_v = 1e9;
+  for (const auto& s : traj.states)
+    min_v = std::min(min_v, s.v);
+  EXPECT_LT(min_v, 3.0);
+
+  // the crossing vehicle reaches the ego path (y=0) at t=6.25 s; until then
+  // the ego must stay short of the conflict point.
+  for (const auto& s : traj.states) {
+    if (s.t <= 6.2)
+      EXPECT_LT(s.x, 40.0 - 2.0 + 0.5);
+    EXPECT_LE(s.a, cfg.idm_max_accel + 1e-9);
+  }
+  // after clearance the ego resumes.
+  EXPECT_GT(traj.states.back().v, 2.0);
+}
+
+TEST(OverrideTest, IntersectionCautionTtcGuardVetoes) {
+  std::vector<pdt::Agent> agents;
+  agents.push_back(straight_vehicle(1, 40.0, -50.0, 8.0, kPi / 2));
+  agents.push_back(stationary_vehicle(7.0));
+  const auto sc = straight_scenario(std::move(agents));
+
+  pdt::PlannerConfig cfg;
+  const auto ov = get_override(cfg, "intersection_caution");
+  ASSERT_NE(ov, nullptr);
+  pdt::Context ctx;
+  ctx.t = 0.0;
+  ctx.s_ego = 0.0;
+  ctx.tangent_heading = 0.0;
+  EXPECT_FALSE(ov->applicable(sc, sc.ego_init, ctx));
 }
 
 TEST(OverrideTest, OffReproducesOriginalTrajectoryByteForByte) {
@@ -199,4 +259,4 @@ TEST(OverrideTest, EarlyBrakingActivatesAndStopsAtSafeGap) {
   EXPECT_LT(last.x, base.states.back().x) << "override should stop earlier than the base planner";
 }
 
-}  // namespace
+} // namespace

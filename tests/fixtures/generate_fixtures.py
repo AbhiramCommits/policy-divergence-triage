@@ -25,9 +25,9 @@ OUT = Path(__file__).resolve().parent / "scenarios.jsonl"
 
 DT = 0.1
 HORIZON = 8.0
-N_STEPS = int(round(HORIZON / DT))
+N_STEPS = round(HORIZON / DT)
 LOG_HORIZON = 11.0
-LOG_STEPS = int(round(LOG_HORIZON / DT))
+LOG_STEPS = round(LOG_HORIZON / DT)
 
 
 def state(t, x, y, heading, v, a=0.0):
@@ -42,7 +42,7 @@ def state(t, x, y, heading, v, a=0.0):
 
 
 def track_of(fn, t0=0.0, t1=HORIZON, dt=DT):
-    n = int(round((t1 - t0) / dt))
+    n = round((t1 - t0) / dt)
     return [state(t0 + i * dt, *fn(t0 + i * dt)) for i in range(n + 1)]
 
 
@@ -63,7 +63,7 @@ def integrate(start, n, dt, step_fn):
 
 
 def straight_cl(x0=0.0, x1=60.0, y=0.0, step=5.0):
-    n = int(round((x1 - x0) / step))
+    n = round((x1 - x0) / step)
     return [[round(x0 + i * step, 6), y] for i in range(n + 1)]
 
 
@@ -366,8 +366,7 @@ def main():
     assert len(scenarios) == 20
     assert len({s["id"] for s in scenarios}) == 20
     with open(OUT, "w") as f:
-        for s in scenarios:
-            f.write(json.dumps(s, separators=(",", ":")) + "\n")
+        f.writelines(json.dumps(s, separators=(",", ":")) + "\n" for s in scenarios)
     print(f"wrote {len(scenarios)} scenarios to {OUT}")
 
 

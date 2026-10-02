@@ -1,6 +1,4 @@
-import json
 
-import pytest
 
 from pdt.gate import check, load_config
 

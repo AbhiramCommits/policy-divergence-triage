@@ -2,7 +2,6 @@ import math
 
 import numpy as np
 import pytest
-
 from pdt.metrics import compute_metrics_row, min_ttc_at_step
 
 
@@ -14,7 +13,6 @@ def make_states(v=10.0, n=81, dt=0.1, heading=0.0):
 
 
 def make_scenario(agents=None, centerline=((0.0, 0.0), (60.0, 0.0)), speed_limit=11.18, human=None):
-    n = 81
     if human is None:
         human = make_states(10.0)
     return {

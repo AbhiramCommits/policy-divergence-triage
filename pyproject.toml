@@ -38,3 +38,15 @@ sdist.include = ["cpp/**", "tests/**", "scenarios/*.py", "scenarios/manifest.txt
 
 [tool.pytest.ini_options]
 markers = ["slow: long-running tests (fixture pipeline)"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+ignore = ["RUF046"]  # misfires on numpy integer types, which still need int() for JSON
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = false
+warn_return_any = false

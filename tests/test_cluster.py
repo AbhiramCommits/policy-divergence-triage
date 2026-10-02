@@ -1,12 +1,8 @@
-import json
-import shutil
 
 import joblib
 import numpy as np
 import pandas as pd
-import pytest
-
-from pdt.cluster import TAGS, build_features, run_clustering
+from pdt.cluster import TAGS, run_clustering
 from pdt.review import generate_cluster_png, load_labels, save_labels
 
 FIELDS = [
@@ -170,8 +166,9 @@ def test_review_non_interactive_generates_plots(tmp_path):
         p = generate_cluster_png(cluster, pd.read_parquet(traj_path), df, plots_dir)
         assert p.exists()
 
-    from pdt.review import run as review_run
     import argparse
+
+    from pdt.review import run as review_run
 
     args = argparse.Namespace(
         clusters=str(out / "clusters.parquet"),

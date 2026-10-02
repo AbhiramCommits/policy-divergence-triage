@@ -1,292 +1,170 @@
 {
   "method": "kmeans",
-  "k": 10,
+  "k": 5,
   "threshold": 0.5,
   "seed": 0,
-  "n_rows_filtered": 533,
+  "n_rows_filtered": 2669,
   "silhouette_sweep": {
-    "3": 0.17044033947610873,
-    "4": 0.19233099664260253,
-    "5": 0.18644378878941434,
-    "6": 0.19500423770738995,
-    "7": 0.18490467377344932,
-    "8": 0.19452529751870432,
-    "9": 0.19012924139467366,
-    "10": 0.1966881399123445,
-    "11": 0.17539102452200211,
-    "12": 0.16539690643762786
+    "3": 0.15396305660702175,
+    "4": 0.15604135251265946,
+    "5": 0.19202053255345072,
+    "6": 0.18297932769029326,
+    "7": 0.17813933349984143,
+    "8": 0.1782653697874463,
+    "9": 0.16586722046729735,
+    "10": 0.16926902775428423,
+    "11": 0.17056680742771554,
+    "12": 0.1647930791398738
   },
   "dbscan": {
     "0.5": {
-      "silhouette": null,
-      "n_clusters": 1,
-      "n_noise": 528
+      "silhouette": 0.5808327781952477,
+      "n_clusters": 22,
+      "n_noise": 2400
     },
     "0.75": {
-      "silhouette": 0.714569633813034,
-      "n_clusters": 4,
-      "n_noise": 509
+      "silhouette": 0.29381546217840604,
+      "n_clusters": 49,
+      "n_noise": 1914
     },
     "1.0": {
-      "silhouette": 0.6128446487521476,
-      "n_clusters": 5,
-      "n_noise": 489
+      "silhouette": 0.08917112666519737,
+      "n_clusters": 52,
+      "n_noise": 1438
     },
     "1.25": {
-      "silhouette": 0.40221027666737313,
-      "n_clusters": 12,
-      "n_noise": 432
+      "silhouette": -0.08961003286453957,
+      "n_clusters": 43,
+      "n_noise": 986
     },
     "1.5": {
-      "silhouette": 0.1687705095394373,
-      "n_clusters": 8,
-      "n_noise": 312
+      "silhouette": 0.07925383976837863,
+      "n_clusters": 5,
+      "n_noise": 498
     }
   },
-  "best_silhouette": 0.1966881399123445,
+  "best_silhouette": 0.19202053255345072,
   "clusters": [
     {
-      "cluster_id": 1,
-      "size": 149,
+      "cluster_id": 2,
+      "size": 1184,
       "centroid": {
-        "max_lateral_deviation_m": 5.296218334015992,
-        "mean_lateral_deviation_m": 1.7802028522792843,
-        "final_position_gap_m": 14.389769186046765,
-        "ttc_delta_s": -0.35531381942449725,
-        "jerk_delta": -5.951826643618223,
-        "accel_delta": 0.015695083250527264,
-        "decision_flip_count": 79.30201342281877,
-        "progress_delta": 14.750008745454743,
-        "ade_delta": -1.9324416040905152,
-        "dominant_flip_kind": "rule_ASSERT_ml_FOLLOW",
-        "dominant_tag": "lead_vehicle_braking"
-      },
-      "exemplars": [
-        "313de9d8-9c3b-4f91-8b52-da8eafadc71c",
-        "4b2f8e01-9273-4f8a-afcc-f0e4cd1b2313",
-        "f3c7e57d-90fb-44e8-9e2e-18a2a621a632",
-        "b16c3234-6c13-413c-a1f7-7e0919a15ee1",
-        "a40bb8d1-03e6-4f57-8dea-f5654b4f8b18"
-      ],
-      "signature": "ML FOLLOW where rule ASSERT; ML progress +14.8 m; max lateral deviation 5.3 m; ML jerk -6.0 m/s^3; ML ADE vs human -1.9 m"
-    },
-    {
-      "cluster_id": 0,
-      "size": 106,
-      "centroid": {
-        "max_lateral_deviation_m": 8.080098166602081,
-        "mean_lateral_deviation_m": 3.038617796840683,
-        "final_position_gap_m": 17.492778685144188,
-        "ttc_delta_s": 0.130886362766379,
-        "jerk_delta": -2.7501406776955433,
-        "accel_delta": -0.3813423293955707,
-        "decision_flip_count": 8.849056603773587,
-        "progress_delta": 2.261459450028157,
-        "ade_delta": 0.26880490882874053,
+        "max_lateral_deviation_m": 12.077997945036543,
+        "mean_lateral_deviation_m": 3.529530395583123,
+        "final_position_gap_m": 26.095612757693743,
+        "ttc_delta_s": 1.1775153772183482,
+        "jerk_delta": -0.09270905373367455,
+        "accel_delta": -0.5724681055659808,
+        "decision_flip_count": 6.205236486486481,
+        "progress_delta": -8.911758321188175,
+        "ade_delta": -3.9469374468346357,
         "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
         "dominant_tag": "lead_vehicle_braking"
       },
       "exemplars": [
-        "0537fb18-f22f-490c-aa9f-05bd219a7379",
-        "8faa71f4-1dfb-4647-a533-f79b45134ed0",
-        "cb025164-020c-4c7c-a82a-4e34ff12a65c",
-        "e6e93d5f-1d13-450a-9c47-fc5f8d5ce1aa",
-        "e93f9945-fbaa-4645-84f4-1b4d39278f16"
+        "584d1bb0-9082-4617-b9f1-3141b2dd0ebe",
+        "d995c385-b620-4cc0-a856-35b09903c1fc",
+        "446c2335-340c-4c3c-b138-2b41f3b63a69",
+        "cdecb001-42a1-4132-8403-6ca00ef43ef6",
+        "15cd9040-f30f-43b8-9fa0-dc371cf79402"
       ],
-      "signature": "ML ASSERT where rule FOLLOW; ML progress +2.3 m; max lateral deviation 8.1 m; ML jerk -2.8 m/s^3"
-    },
-    {
-      "cluster_id": 6,
-      "size": 103,
-      "centroid": {
-        "max_lateral_deviation_m": 5.556593772905439,
-        "mean_lateral_deviation_m": 2.1402537645382225,
-        "final_position_gap_m": 20.379934944100363,
-        "ttc_delta_s": -0.40726938869847784,
-        "jerk_delta": -26.314060020081968,
-        "accel_delta": -1.037207142462658,
-        "decision_flip_count": 11.300970873786408,
-        "progress_delta": 14.339010522137546,
-        "ade_delta": -1.0379106375113771,
-        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
-        "dominant_tag": "lead_vehicle_braking"
-      },
-      "exemplars": [
-        "e6234add-1806-4e56-9b88-36175030e578",
-        "b82dd341-28a8-40a7-9ea3-c911d65630e1",
-        "1df8ba11-6e59-4f9a-9950-349a6c4ab979",
-        "aed1ec27-5326-4fe6-9e89-8c304cae32e8",
-        "21a1e2f3-d71c-45d1-ae20-c350eba263c9"
-      ],
-      "signature": "ML ASSERT where rule FOLLOW; ML progress +14.3 m; max lateral deviation 5.6 m; ML jerk -26.3 m/s^3; ML ADE vs human -1.0 m"
+      "signature": "ML min TTC 1.2 s higher; ML ASSERT where rule FOLLOW; ML progress -8.9 m; max lateral deviation 12.1 m; ML ADE vs human -3.9 m"
     },
     {
       "cluster_id": 3,
-      "size": 63,
+      "size": 917,
       "centroid": {
-        "max_lateral_deviation_m": 34.02818504881144,
-        "mean_lateral_deviation_m": 10.085249589477797,
-        "final_position_gap_m": 37.18863398302562,
-        "ttc_delta_s": 0.951644582358983,
-        "jerk_delta": -10.188399583950098,
-        "accel_delta": -0.7082303471346391,
-        "decision_flip_count": 23.476190476190474,
-        "progress_delta": -1.139058646901388,
-        "ade_delta": -7.37486711143776,
+        "max_lateral_deviation_m": 8.03151372483708,
+        "mean_lateral_deviation_m": 2.907490222405807,
+        "final_position_gap_m": 28.90586340378972,
+        "ttc_delta_s": -0.2471904617127817,
+        "jerk_delta": -21.241739528126175,
+        "accel_delta": -1.0893277662103615,
+        "decision_flip_count": 6.183206106870221,
+        "progress_delta": 23.93054213728547,
+        "ade_delta": -4.0295399221195565,
         "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
         "dominant_tag": "lead_vehicle_braking"
       },
       "exemplars": [
-        "c01e0994-8575-4f06-af37-345a9210aff9",
-        "59c22e18-87d1-4b72-b463-6eed35ebe073",
-        "51eb2778-3fab-4a42-8bd2-327d6d7e7da1",
-        "4902c7c2-38ee-4c02-9168-5c187a68f313",
-        "531ff47f-cecb-44a8-9f71-0fa9dc8d5163"
+        "29c08602-1ee1-492e-85ea-8373f19b4bec",
+        "68079785-1be2-4935-b29b-488b222dfa6f",
+        "3c1115e6-9593-45b9-b606-670bea25bbd4",
+        "2b65e62e-3816-4e3d-b430-363214a57888",
+        "ac8e0ee1-b357-490f-bb0f-a57b7848f427"
       ],
-      "signature": "ML min TTC 1.0 s higher; ML ASSERT where rule FOLLOW; ML progress -1.1 m; max lateral deviation 34.0 m; ML jerk -10.2 m/s^3; ML ADE vs human -7.4 m"
+      "signature": "ML ASSERT where rule FOLLOW; ML progress +23.9 m; max lateral deviation 8.0 m; ML jerk -21.2 m/s^3; ML ADE vs human -4.0 m"
     },
     {
-      "cluster_id": 2,
-      "size": 47,
+      "cluster_id": 1,
+      "size": 430,
       "centroid": {
-        "max_lateral_deviation_m": 4.3495015449542995,
-        "mean_lateral_deviation_m": 1.099971574349043,
-        "final_position_gap_m": 37.25216588481257,
-        "ttc_delta_s": 1.5450575739089643,
-        "jerk_delta": -1.3132882795429701,
-        "accel_delta": -0.867656450605431,
-        "decision_flip_count": 10.085106382978722,
-        "progress_delta": -25.93684164819471,
-        "ade_delta": -10.08098173270903,
-        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
-        "dominant_tag": "other"
+        "max_lateral_deviation_m": 9.012329451548755,
+        "mean_lateral_deviation_m": 2.5817638494861095,
+        "final_position_gap_m": 19.546380964086588,
+        "ttc_delta_s": 0.06762065800134287,
+        "jerk_delta": -6.721998988596534,
+        "accel_delta": -0.1274561419716459,
+        "decision_flip_count": 76.86976744186049,
+        "progress_delta": 13.380863420728108,
+        "ade_delta": -2.7817093142761697,
+        "dominant_flip_kind": "rule_ASSERT_ml_FOLLOW",
+        "dominant_tag": "left_turn"
       },
       "exemplars": [
-        "4569aa9f-d2f5-4c4e-af00-d083c0c3f42c",
-        "280e468b-e314-4a70-bdd5-93fe0538c200",
-        "4af6977d-b00e-4001-853b-c80449504bc3",
-        "7f88f3e5-4716-4884-9d76-bd303d957734",
-        "ecd75c7a-0a80-4abe-a8ac-82fab21f6fb1"
+        "ea045f65-ac6f-4589-8aa1-0d66a21968cb",
+        "b06f6d1a-84f1-4a6b-87ef-d7450986ed17",
+        "802dbcae-12a4-4625-b8a6-b24ab8f68520",
+        "fe4e2ab7-b88c-4895-829d-0f5b2616960b",
+        "426fe3df-e978-4e50-a200-40abb85ab4d8"
       ],
-      "signature": "ML min TTC 1.5 s higher; ML ASSERT where rule FOLLOW; ML progress -25.9 m; max lateral deviation 4.3 m; ML ADE vs human -10.1 m"
+      "signature": "ML FOLLOW where rule ASSERT; ML progress +13.4 m; max lateral deviation 9.0 m; ML jerk -6.7 m/s^3; ML ADE vs human -2.8 m"
+    },
+    {
+      "cluster_id": 0,
+      "size": 137,
+      "centroid": {
+        "max_lateral_deviation_m": 62.75873529711288,
+        "mean_lateral_deviation_m": 19.39181756532829,
+        "final_position_gap_m": 72.40730953727217,
+        "ttc_delta_s": 0.15974679037694406,
+        "jerk_delta": -6.780009191444912,
+        "accel_delta": -0.3415814224582219,
+        "decision_flip_count": 13.766423357664232,
+        "progress_delta": -1.3571704797876567,
+        "ade_delta": -19.33592913708678,
+        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
+        "dominant_tag": "lead_vehicle_braking"
+      },
+      "exemplars": [
+        "07518c58-f0bd-4038-b890-71d8ce4cae45",
+        "a9d4623c-b11f-474c-a1f9-e103fa5335e5",
+        "e403e778-3211-4e82-90b4-22d4b48aa66b",
+        "4902c7c2-38ee-4c02-9168-5c187a68f313",
+        "bf988cbe-47e5-4bf5-9b23-fa30daaaef07"
+      ],
+      "signature": "ML ASSERT where rule FOLLOW; ML progress -1.4 m; max lateral deviation 62.8 m; ML jerk -6.8 m/s^3; ML ADE vs human -19.3 m"
     },
     {
       "cluster_id": 4,
-      "size": 35,
-      "centroid": {
-        "max_lateral_deviation_m": 6.357646525501326,
-        "mean_lateral_deviation_m": 2.609988437637263,
-        "final_position_gap_m": 46.28235203118822,
-        "ttc_delta_s": -0.5990900556856854,
-        "jerk_delta": -4.436373436347795,
-        "accel_delta": -1.3479754692003234,
-        "decision_flip_count": 15.599999999999998,
-        "progress_delta": 43.265571035088016,
-        "ade_delta": -7.280691095647462,
-        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
-        "dominant_tag": "lead_vehicle_braking"
-      },
-      "exemplars": [
-        "0df7a151-81b9-40be-bd3e-83a0ce078920",
-        "615331f4-f3a5-4870-9480-121eb651fb3a",
-        "c2438f6b-79fa-43e9-856e-b625ab63466e",
-        "f6e56086-e832-4047-ab6a-c7eed73952d3",
-        "bdb43ac2-1c8f-4196-aa3e-2673f94cd57f"
-      ],
-      "signature": "ML min TTC 0.6 s lower; ML ASSERT where rule FOLLOW; ML progress +43.3 m; max lateral deviation 6.4 m; ML jerk -4.4 m/s^3; ML ADE vs human -7.3 m"
-    },
-    {
-      "cluster_id": 9,
-      "size": 21,
-      "centroid": {
-        "max_lateral_deviation_m": 16.342296808414844,
-        "mean_lateral_deviation_m": 3.548004441410281,
-        "final_position_gap_m": 32.86624129726551,
-        "ttc_delta_s": 13.147249906043362,
-        "jerk_delta": 0.7243934131181131,
-        "accel_delta": -1.0417781976138172,
-        "decision_flip_count": 20.285714285714285,
-        "progress_delta": -22.26363177355106,
-        "ade_delta": -5.340022330954387,
-        "dominant_flip_kind": "rule_FOLLOW_ml_STOP",
-        "dominant_tag": "straight_through_intersection"
-      },
-      "exemplars": [
-        "ad15984f-f679-44a5-82d1-2bf25b22163c",
-        "d2c61201-0a94-4063-8e02-6ac324df1602",
-        "a8f72d21-1f07-4b09-9f13-8440d1ff2e2d",
-        "bcd4bd56-6a38-40e9-9b32-dff8390c1b0b",
-        "fe62a398-e5ff-4943-a733-d05cf3cdb34f"
-      ],
-      "signature": "ML min TTC 13.1 s higher; ML STOP where rule FOLLOW; ML progress -22.3 m; max lateral deviation 16.3 m; ML ADE vs human -5.3 m"
-    },
-    {
-      "cluster_id": 7,
-      "size": 6,
-      "centroid": {
-        "max_lateral_deviation_m": 58.34124960713695,
-        "mean_lateral_deviation_m": 25.684039134624353,
-        "final_position_gap_m": 72.23187653337608,
-        "ttc_delta_s": 0.0303529853609118,
-        "jerk_delta": -6.445450334001759,
-        "accel_delta": -0.7760036218560193,
-        "decision_flip_count": 25.5,
-        "progress_delta": -23.36627673161065,
-        "ade_delta": -35.77789213010688,
-        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
-        "dominant_tag": "lead_vehicle_braking"
-      },
-      "exemplars": [
-        "fd6518f1-71ae-42a9-a6d3-bbe7712b61cb",
-        "2fe3ef9e-a1d4-40e5-bfa7-a59967b3f5ee",
-        "f31b446d-f8f6-4857-8cad-bf131f04b3ce",
-        "07518c58-f0bd-4038-b890-71d8ce4cae45",
-        "2edc6132-0329-411a-895e-e3560fb13d6a"
-      ],
-      "signature": "ML ASSERT where rule FOLLOW; ML progress -23.4 m; max lateral deviation 58.3 m; ML jerk -6.4 m/s^3; ML ADE vs human -35.8 m"
-    },
-    {
-      "cluster_id": 5,
-      "size": 2,
-      "centroid": {
-        "max_lateral_deviation_m": 80.70554454322512,
-        "mean_lateral_deviation_m": 34.444828988437095,
-        "final_position_gap_m": 114.75646886481661,
-        "ttc_delta_s": 1.1901843142712774,
-        "jerk_delta": -4.512076196738932,
-        "accel_delta": -0.43972414307478236,
-        "decision_flip_count": 23.0,
-        "progress_delta": -81.6033062965774,
-        "ade_delta": 34.93144342171436,
-        "dominant_flip_kind": "rule_FOLLOW_ml_ASSERT",
-        "dominant_tag": "lane_change"
-      },
-      "exemplars": [
-        "5d683e78-9038-479a-b805-a90d5dedb94b",
-        "c4603f4c-3c2d-4f97-ad48-26bc08f592ab"
-      ],
-      "signature": "ML min TTC 1.2 s higher; ML ASSERT where rule FOLLOW; ML progress -81.6 m; max lateral deviation 80.7 m; ML jerk -4.5 m/s^3; ML ADE vs human +34.9 m"
-    },
-    {
-      "cluster_id": 8,
       "size": 1,
       "centroid": {
-        "max_lateral_deviation_m": 33.802269873067175,
-        "mean_lateral_deviation_m": 6.480867600379261,
-        "final_position_gap_m": 32.071914487920516,
-        "ttc_delta_s": 47.86094785580723,
-        "jerk_delta": 0.43693780721105924,
-        "accel_delta": -1.194017077233901,
-        "decision_flip_count": 6.0,
-        "progress_delta": -41.60644129816255,
-        "ade_delta": -0.21631240737775315,
+        "max_lateral_deviation_m": 18.763912410931475,
+        "mean_lateral_deviation_m": 5.3654262090191445,
+        "final_position_gap_m": 7.222488634054255,
+        "ttc_delta_s": 1251.799677975107,
+        "jerk_delta": 2.778675048021876,
+        "accel_delta": -1.2091276709219585,
+        "decision_flip_count": 80.99999999999999,
+        "progress_delta": -7.157143586451351,
+        "ade_delta": -7.8385564312856335,
         "dominant_flip_kind": "rule_FOLLOW_ml_STOP",
-        "dominant_tag": "straight_through_intersection"
+        "dominant_tag": "left_turn"
       },
       "exemplars": [
-        "755e07e0-044e-4519-9877-aaede37c7f4e"
+        "65408889-d842-469f-80c7-3d5ba716a375"
       ],
-      "signature": "ML min TTC 47.9 s higher; ML STOP where rule FOLLOW; ML progress -41.6 m; max lateral deviation 33.8 m"
+      "signature": "ML min TTC 1251.8 s higher; ML STOP where rule FOLLOW; ML progress -7.2 m; max lateral deviation 18.8 m; ML jerk +2.8 m/s^3; ML ADE vs human -7.8 m"
     }
   ],
   "assigned_with_existing_model": false

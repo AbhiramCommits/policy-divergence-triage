@@ -10,4 +10,4 @@ namespace pdt {
 std::vector<Scenario> load_scenarios(const std::string& path);
 void save_scenarios(const std::vector<Scenario>& scenarios, const std::string& path);
 
-}  // namespace pdt
+} // namespace pdt

@@ -49,7 +49,9 @@ void to_json(json& j, const Scenario& sc) {
   j["ego_init"] = sc.ego_init;
   j["agents"] = sc.agents;
   j["centerline"] = json::array();
-  for (const auto& pt : sc.centerline) j["centerline"].push_back({pt[0], pt[1]});
+  for (const auto& pt : sc.centerline) {
+    j["centerline"].push_back({pt[0], pt[1]});
+  }
   j["speed_limit"] = sc.speed_limit;
   j["logged_ego"] = sc.logged_ego;
 }
@@ -69,13 +71,17 @@ void from_json(const json& j, Scenario& sc) {
 
 std::vector<Scenario> load_scenarios(const std::string& path) {
   std::ifstream in(path);
-  if (!in.is_open()) throw std::runtime_error("cannot open scenario file: " + path);
+  if (!in.is_open()) {
+    throw std::runtime_error("cannot open scenario file: " + path);
+  }
   std::vector<Scenario> out;
   std::string line;
   size_t lineno = 0;
   while (std::getline(in, line)) {
     ++lineno;
-    if (line.empty() || line[0] == '#') continue;
+    if (line.empty() || line[0] == '#') {
+      continue;
+    }
     try {
       out.push_back(json::parse(line).get<Scenario>());
     } catch (const std::exception& e) {
@@ -87,8 +93,12 @@ std::vector<Scenario> load_scenarios(const std::string& path) {
 
 void save_scenarios(const std::vector<Scenario>& scenarios, const std::string& path) {
   std::ofstream out(path, std::ios::trunc);
-  if (!out.is_open()) throw std::runtime_error("cannot open scenario file for writing: " + path);
-  for (const auto& sc : scenarios) out << json(sc).dump() << "\n";
+  if (!out.is_open()) {
+    throw std::runtime_error("cannot open scenario file for writing: " + path);
+  }
+  for (const auto& sc : scenarios) {
+    out << json(sc).dump() << "\n";
+  }
 }
 
-}  // namespace pdt
+} // namespace pdt

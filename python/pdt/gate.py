@@ -78,7 +78,7 @@ def print_table(rows: list[dict]) -> None:
     print(f"{'check':42s} {'before':>10s} {'after':>10s} {'threshold':>18s}  result")
     for r in rows:
         status = "PASS" if r["pass"] else "FAIL"
-        print(f"{r['check']:42s} {str(r['before']):>10s} {str(r['after']):>10s} {r['threshold']:>18s}  {status}")
+        print(f"{r['check']:42s} {r['before']!s:>10s} {r['after']!s:>10s} {r['threshold']:>18s}  {status}")
 
 
 def main() -> None:

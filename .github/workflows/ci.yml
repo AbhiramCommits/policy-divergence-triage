@@ -24,9 +24,15 @@ jobs:
 
       - name: Build C++ core and run GoogleTest
         run: |
-          cmake -S . -B build
+          cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           cmake --build build -j4
           ctest --test-dir build --output-on-failure
+
+      - name: Lint (clang-format, clang-tidy, ruff, mypy)
+        run: |
+          sudo apt-get install -y clang-format clang-tidy >/dev/null
+          python -m pip install ruff mypy
+          make lint
 
       - name: Run pytest suite
         run: python -m pytest tests -q

@@ -18,6 +18,7 @@ struct PlannerCommand {
 struct ConflictInfo {
   double s = 0.0;
   double t_agent = 0.0;
+  bool vehicle = false;
 };
 
 struct LeaderInfo {
@@ -50,7 +51,7 @@ struct GuardProfile {
 };
 
 class Override {
- public:
+public:
   virtual ~Override() = default;
   virtual std::string name() const = 0;
   virtual bool applicable(const Scenario& scenario, const State& ego, const Context& ctx) const = 0;
@@ -62,4 +63,4 @@ std::vector<std::unique_ptr<Override>> make_overrides(const PlannerConfig& cfg);
 GuardProfile predict_guard_profile(const Scenario& scenario, const State& ego, const Context& ctx,
                                    const PlannerCommand& cmd, const PlannerConfig& cfg);
 
-}  // namespace pdt
+} // namespace pdt

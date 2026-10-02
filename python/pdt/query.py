@@ -7,9 +7,14 @@ from __future__ import annotations
 import argparse
 
 import duckdb
+import pandas as pd
 
 CANNED_QUERIES: dict[str, str] = {
-    "top50": "SELECT * FROM divergence ORDER BY divergence_score DESC LIMIT 50",
+    "top50": """
+        SELECT * FROM divergence
+        ORDER BY divergence_score DESC, scenario_id
+        LIMIT 50
+    """,
     "per_tag": """
         SELECT tag,
                COUNT(*) AS n,
@@ -18,14 +23,14 @@ CANNED_QUERIES: dict[str, str] = {
                ROUND(AVG(decision_flip_count), 2) AS avg_flips
         FROM divergence
         GROUP BY tag
-        ORDER BY mean_score DESC
+        ORDER BY mean_score DESC, tag
     """,
     "flips": """
         SELECT flip_kind, COUNT(*) AS n
         FROM divergence
         WHERE flip_kind <> ''
         GROUP BY flip_kind
-        ORDER BY n DESC
+        ORDER BY n DESC, flip_kind
     """,
     "hard_brake": """
         SELECT SUM(hard_brake_rule) AS rule_hard_brakes,
@@ -49,7 +54,7 @@ def connect(divergence: str, trajectories: str | None = None) -> duckdb.DuckDBPy
     return con
 
 
-def run_query(con: duckdb.DuckDBPyConnection, sql: str) -> "duckdb.DuckDBPyRelation":
+def run_query(con: duckdb.DuckDBPyConnection, sql: str) -> pd.DataFrame:
     return con.execute(sql).fetchdf()
 
 

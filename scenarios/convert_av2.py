@@ -30,7 +30,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-
 from av2.datasets.motion_forecasting import scenario_serialization
 from av2.datasets.motion_forecasting.data_schema import ObjectType
 
@@ -332,6 +331,15 @@ def main() -> None:
     parquet_files = sorted(args.input.glob("*/*.parquet"))
     if not parquet_files:
         sys.exit(f"no scenario parquets found under {args.input}; run scenarios/fetch_av2.py first")
+
+    manifest = ROOT / "manifest.txt"
+    if manifest.exists():
+        wanted = {
+            line.strip() for line in manifest.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+        if wanted:
+            parquet_files = [p for p in parquet_files if p.parent.name in wanted]
     if args.limit:
         parquet_files = parquet_files[: args.limit]
 
@@ -339,17 +347,16 @@ def main() -> None:
     written = 0
     failed = 0
     ctx = mp.get_context("fork" if "fork" in mp.get_all_start_methods() else "spawn")
-    with open(args.output, "w") as f:
-        with ctx.Pool(args.workers) as pool:
-            for err, sc in pool.imap(_worker, parquet_files, chunksize=4):
-                if sc is None:
-                    failed += 1
-                    if err:
-                        print(f"failed: {err}", file=sys.stderr)
-                    continue
-                f.write(json.dumps(sc, separators=(",", ":")) + "\n")
-                tag_counts[sc["tag"]] += 1
-                written += 1
+    with open(args.output, "w") as f, ctx.Pool(args.workers) as pool:
+        for err, sc in pool.imap(_worker, parquet_files, chunksize=4):
+            if sc is None:
+                failed += 1
+                if err:
+                    print(f"failed: {err}", file=sys.stderr)
+                continue
+            f.write(json.dumps(sc, separators=(",", ":")) + "\n")
+            tag_counts[sc["tag"]] += 1
+            written += 1
 
     print(f"converted {written} scenarios (failed: {failed}) -> {args.output}")
     print("tag distribution:")

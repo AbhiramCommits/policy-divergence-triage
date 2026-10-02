@@ -18,16 +18,16 @@ import json
 import multiprocessing as mp
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pdt_core
 import torch
 
-import pdt_core
-
 from pdt.metrics import FIELDS, compute_metrics_row
-from pdt.policy import DECISION_NAMES, MLPolicy, POLICY_CFG, is_train_id, rollout
+from pdt.policy import DECISION_NAMES, POLICY_CFG, MLPolicy, is_train_id, rollout
 
 _CTX: dict = {}
 
@@ -86,12 +86,16 @@ def _run_task(task: tuple[str, int]) -> dict:
     d = json.loads(line)
 
     sc = scenario_from_dict(d)
+    t0 = time.perf_counter()
     traj = _CTX["planner"].plan(sc)
+    t_rule = time.perf_counter() - t0
     rule_states = np.array([[s.t, s.x, s.y, s.heading, s.v, s.a] for s in traj.states], dtype=float)
     rule_decisions = [int(getattr(x, "value", x)) for x in traj.decisions]
     events = [{"step": e.step, "name": e.name, "active": bool(e.active), "reason": e.reason} for e in _CTX["planner"].events()]
 
+    t0 = time.perf_counter()
     ml_states, ml_decisions = rollout(d, _CTX["model"], _CTX["cfg"], _CTX["seed"])
+    t_ml = time.perf_counter() - t0
 
     row = compute_metrics_row(
         d,
@@ -106,6 +110,8 @@ def _run_task(task: tuple[str, int]) -> dict:
         "ml_decisions": ml_decisions,
         "metrics": row,
         "events": events,
+        "t_rule": t_rule,
+        "t_ml": t_ml,
     }
 
 
@@ -125,11 +131,7 @@ def line_offsets(path: Path, split: str) -> list[int]:
                     sid = json.loads(line).get("id")
                 except json.JSONDecodeError:
                     pass
-                if sid is None:
-                    pass
-                elif split == "held_out" and is_train_id(sid):
-                    pass
-                elif split == "train" and not is_train_id(sid):
+                if sid is None or split == "held_out" and is_train_id(sid) or split == "train" and not is_train_id(sid):
                     pass
                 else:
                     offsets.append(pos)
@@ -152,10 +154,8 @@ def run(args: argparse.Namespace) -> None:
     # fork is fast but deadlocks with torch's background threads (OpenMP) on
     # Linux; fall back to spawn whenever torch has been imported.
     ctx = mp.get_context("spawn" if "torch" in sys.modules else "fork")
-    results = []
     with ctx.Pool(args.workers, initializer=_worker_init, initargs=(str(args.checkpoint), args.seed, overrides)) as pool:
-        for r in pool.imap(_run_task, tasks, chunksize=1):
-            results.append(r)
+        results = list(pool.imap(_run_task, tasks, chunksize=1))
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -193,6 +193,15 @@ def run(args: argparse.Namespace) -> None:
             event_rows.append({"scenario_id": r["scenario_id"], **e})
     pd.DataFrame(event_rows, columns=["scenario_id", "step", "name", "active", "reason"]).to_parquet(args.events_out)
     print(f"wrote {len(event_rows)} override events to {args.events_out}")
+
+    if results:
+        t_rule_total = sum(r["t_rule"] for r in results)
+        t_ml_total = sum(r["t_ml"] for r in results)
+        n = len(results)
+        print(f"timing: rule planner {n / t_rule_total:.1f} scenarios/s "
+              f"({t_rule_total / n * 1e3:.2f} ms/scenario, wall over {args.workers} workers)")
+        print(f"timing: ml policy    {n / t_ml_total:.1f} scenarios/s "
+              f"({t_ml_total / n * 1e3:.2f} ms/scenario, wall over {args.workers} workers)")
 
 
 def main() -> None:

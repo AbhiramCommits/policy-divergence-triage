@@ -13,13 +13,18 @@
 
 namespace {
 
-std::string fixture_path() { return std::string(PDT_FIXTURE_DIR) + "/scenarios.jsonl"; }
+std::string fixture_path() {
+  return std::string(PDT_FIXTURE_DIR) + "/scenarios.jsonl";
+}
 
-std::vector<pdt::Scenario> load_fixtures() { return pdt::load_scenarios(fixture_path()); }
+std::vector<pdt::Scenario> load_fixtures() {
+  return pdt::load_scenarios(fixture_path());
+}
 
 const pdt::Scenario* find_by_id(const std::vector<pdt::Scenario>& scs, const std::string& id) {
   for (const auto& s : scs) {
-    if (s.id == id) return &s;
+    if (s.id == id)
+      return &s;
   }
   return nullptr;
 }
@@ -77,8 +82,10 @@ TEST(PlannerTest, YieldStopsBeforeConflictPoint) {
   const double kConflictX = 30.0;
   for (size_t i = 0; i < traj.decisions.size(); ++i) {
     const auto dec = traj.decisions[i];
-    if (dec == pdt::Decision::YIELD) saw_yield = true;
-    if (dec == pdt::Decision::STOP) saw_stop = true;
+    if (dec == pdt::Decision::YIELD)
+      saw_yield = true;
+    if (dec == pdt::Decision::STOP)
+      saw_stop = true;
     if (dec == pdt::Decision::YIELD || dec == pdt::Decision::STOP) {
       EXPECT_LE(traj.states[i].x, 28.6) << "ego crosses the conflict point while yielding/stopped at step " << i;
     }
@@ -91,4 +98,4 @@ TEST(PlannerTest, YieldStopsBeforeConflictPoint) {
   EXPECT_TRUE(saw_stop);
 }
 
-}  // namespace
+} // namespace

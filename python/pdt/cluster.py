@@ -97,7 +97,7 @@ def fit_bundle(
     if len(filtered) < 4:
         raise ValueError(f"only {len(filtered)} rows above threshold {threshold}; need at least 4 to cluster")
 
-    d, numeric, onehot = build_features(filtered)
+    _, numeric, onehot = build_features(filtered)
     scaler = StandardScaler().fit(numeric)
     X = np.hstack([scaler.transform(numeric), onehot])
 
@@ -147,14 +147,16 @@ def fit_bundle(
             "best_silhouette": best_sil,
         },
     }
+    assert best_model is not None
     return bundle, filtered, X, best_model.predict(X)
 
 
 def assign(bundle: dict, df: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     d, numeric, onehot = build_features(df)
     X = np.hstack([bundle["scaler"].transform(numeric), onehot])
-    labels = bundle["model"].predict(X)
-    dists = bundle["model"].transform(X).min(axis=1)
+    model = bundle["model"]
+    labels = model.predict(X)
+    dists = model.transform(X).min(axis=1)
     return d, labels, dists
 
 
@@ -197,20 +199,20 @@ def _sanitize(obj):
 def summarize(
     bundle: dict, filtered: pd.DataFrame, labels: np.ndarray, dists: np.ndarray
 ) -> dict:
-    clusters = []
+    clusters: list[dict] = []
     n_oh = len(FLIP_KINDS)
     for cid in sorted(set(labels)):
         idx = np.where(labels == cid)[0]
         center = bundle["model"].cluster_centers_[cid]
         num_centroid = bundle["scaler"].inverse_transform(center[: len(NUMERIC_FEATURES)][None, :])[0]
-        centroid = {name: float(v) for name, v in zip(NUMERIC_FEATURES, num_centroid)}
+        centroid: dict[str, float | str] = {name: float(v) for name, v in zip(NUMERIC_FEATURES, num_centroid)}
         flip_part = center[len(NUMERIC_FEATURES): len(NUMERIC_FEATURES) + n_oh]
         tag_part = center[len(NUMERIC_FEATURES) + n_oh:]
         centroid["dominant_flip_kind"] = FLIP_KINDS[int(flip_part.argmax())] if flip_part.max() > 0 else ""
         centroid["dominant_tag"] = TAGS[int(tag_part.argmax())]
         order = np.argsort(dists[idx], kind="stable")
         exemplars = [filtered.iloc[int(idx[j])]["scenario_id"] for j in order[:5]]
-        size = int(len(idx))
+        size = len(idx)
         clusters.append({
             "cluster_id": int(cid),
             "size": size,

@@ -17,7 +17,8 @@ namespace {
 PlannerConfig config_from_dict(py::dict d) {
   PlannerConfig c;
   auto get = [&](const char* key, double& out) {
-    if (d.contains(key)) out = py::cast<double>(d[key]);
+    if (d.contains(key))
+      out = py::cast<double>(d[key]);
   };
   get("dt", c.dt);
   get("horizon", c.horizon);
@@ -50,13 +51,15 @@ PlannerConfig config_from_dict(py::dict d) {
   get("early_brake_wait_gap", c.early_brake_wait_gap);
   get("early_brake_wait_speed", c.early_brake_wait_speed);
   get("early_brake_obstacle_lateral", c.early_brake_obstacle_lateral);
+  get("intersection_caution_extended_margin", c.intersection_caution_extended_margin);
+  get("intersection_caution_stop_buffer", c.intersection_caution_stop_buffer);
   if (d.contains("overrides")) {
     c.overrides = py::cast<std::map<std::string, bool>>(d["overrides"]);
   }
   return c;
 }
 
-}  // namespace
+} // namespace
 
 PYBIND11_MODULE(pdt_core, m) {
   m.doc() = "C++ core for policy-divergence-triage";
@@ -137,7 +140,9 @@ PYBIND11_MODULE(pdt_core, m) {
       .def_readwrite("early_brake_stop_gap", &PlannerConfig::early_brake_stop_gap)
       .def_readwrite("early_brake_wait_gap", &PlannerConfig::early_brake_wait_gap)
       .def_readwrite("early_brake_wait_speed", &PlannerConfig::early_brake_wait_speed)
-      .def_readwrite("early_brake_obstacle_lateral", &PlannerConfig::early_brake_obstacle_lateral);
+      .def_readwrite("early_brake_obstacle_lateral", &PlannerConfig::early_brake_obstacle_lateral)
+      .def_readwrite("intersection_caution_extended_margin", &PlannerConfig::intersection_caution_extended_margin)
+      .def_readwrite("intersection_caution_stop_buffer", &PlannerConfig::intersection_caution_stop_buffer);
 
   py::class_<OverrideEvent>(m, "OverrideEvent")
       .def_readonly("step", &OverrideEvent::step)

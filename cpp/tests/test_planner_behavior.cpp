@@ -37,14 +37,15 @@ pdt::Agent straight_vehicle(int id, double x0, double v, double a) {
   return ag;
 }
 
-pdt::Scenario straight_scenario(std::vector<pdt::Agent> agents, double ego_v, double speed_limit,
-                                double ego_y = 0.0, double ego_h = 0.0) {
+pdt::Scenario straight_scenario(std::vector<pdt::Agent> agents, double ego_v, double speed_limit, double ego_y = 0.0,
+                                double ego_h = 0.0) {
   pdt::Scenario sc;
   sc.id = "behavior_test";
   sc.tag = "other";
   sc.ego_init = st(0.0, 0.0, ego_y, ego_h, ego_v, 0.0);
   sc.agents = std::move(agents);
-  for (int i = 0; i <= 150; ++i) sc.centerline.push_back({static_cast<double>(i), 0.0});
+  for (int i = 0; i <= 150; ++i)
+    sc.centerline.push_back({static_cast<double>(i), 0.0});
   sc.speed_limit = speed_limit;
   sc.logged_ego = {sc.ego_init};
   return sc;
@@ -52,7 +53,8 @@ pdt::Scenario straight_scenario(std::vector<pdt::Agent> agents, double ego_v, do
 
 const pdt::Scenario* find_fixture(const std::vector<pdt::Scenario>& scs, const std::string& id) {
   for (const auto& s : scs) {
-    if (s.id == id) return &s;
+    if (s.id == id)
+      return &s;
   }
   return nullptr;
 }
@@ -71,7 +73,8 @@ TEST(IdmTest, LeaderBrakingForcesDeceleration) {
   EXPECT_LT(traj.states[0].a, 0.0);
   bool decelerating = false;
   for (size_t i = 0; i + 1 < traj.states.size(); ++i) {
-    if (traj.states[i].v > traj.states[i + 1].v) decelerating = true;
+    if (traj.states[i].v > traj.states[i + 1].v)
+      decelerating = true;
   }
   EXPECT_TRUE(decelerating);
   for (const auto& s : traj.states) {
@@ -97,7 +100,8 @@ TEST(YieldTest, DistantCrossingAssertsAndHoldsSpeed) {
   const auto traj = pdt::RulePlanner().plan(*sc);
   EXPECT_EQ(traj.decisions[0], pdt::Decision::ASSERT);
   double min_v = 1e9;
-  for (size_t i = 0; i < 30 && i < traj.states.size(); ++i) min_v = std::min(min_v, traj.states[i].v);
+  for (size_t i = 0; i < 30 && i < traj.states.size(); ++i)
+    min_v = std::min(min_v, traj.states[i].v);
   EXPECT_GT(min_v, 9.0);
 }
 
@@ -107,7 +111,8 @@ TEST(YieldTest, ResumesFollowAfterPedestrianClears) {
   ASSERT_NE(sc, nullptr);
   const auto traj = pdt::RulePlanner().plan(*sc);
   bool saw_stop = false;
-  for (const auto d : traj.decisions) saw_stop = saw_stop || d == pdt::Decision::STOP;
+  for (const auto d : traj.decisions)
+    saw_stop = saw_stop || d == pdt::Decision::STOP;
   EXPECT_TRUE(saw_stop);
   EXPECT_EQ(traj.decisions.back(), pdt::Decision::FOLLOW);
   EXPECT_GT(traj.states.back().v, 0.5);
@@ -124,4 +129,4 @@ TEST(ScenarioIoTest, MissingFileThrows) {
   EXPECT_THROW(pdt::load_scenarios("/nonexistent/scenarios.jsonl"), std::runtime_error);
 }
 
-}  // namespace
+} // namespace

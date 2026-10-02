@@ -3,7 +3,15 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from pdt.policy import FOLLOW, MLPolicy, POLICY_CFG, STOP, YIELD, classify_decisions, rollout
+from pdt.policy import (
+    FOLLOW,
+    POLICY_CFG,
+    STOP,
+    YIELD,
+    MLPolicy,
+    classify_decisions,
+    rollout,
+)
 
 
 def make_scenario():

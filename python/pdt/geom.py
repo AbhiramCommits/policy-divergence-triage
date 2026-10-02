@@ -86,3 +86,22 @@ def agents_at_t(tracks: list[tuple[str, np.ndarray]], t: float) -> np.ndarray:
     if not out:
         return np.zeros((0, 5))
     return np.asarray(out, dtype=float)
+
+
+def interpolate_agent_grid(tracks: list[tuple[str, np.ndarray]], times: np.ndarray) -> tuple[list[str], np.ndarray]:
+    """Interpolate every agent track onto a shared time grid, once per
+    scenario. Returns (types, (n_agents, n_times, 5) [x, y, heading, v, a]).
+    Tracks must have sorted timestamps and unwrapped headings."""
+    types: list[str] = []
+    rows = []
+    for typ, tr in tracks:
+        if len(tr) == 0:
+            continue
+        out = np.empty((len(times), 5))
+        for c in range(5):
+            out[:, c] = np.interp(times, tr[:, 0], tr[:, c + 1])
+        rows.append(out)
+        types.append(typ)
+    if not rows:
+        return [], np.zeros((0, len(times), 5))
+    return types, np.stack(rows)

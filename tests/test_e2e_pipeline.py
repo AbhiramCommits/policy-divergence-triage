@@ -3,13 +3,9 @@
 gate passes. Uses the committed tests/fixtures/scenarios.jsonl (no AV2)."""
 
 import argparse
-import json
 from pathlib import Path
 
 import pytest
-
-import pdt_core
-
 from pdt.ab import build_report_from_runs
 from pdt.cluster import run_clustering
 from pdt.gate import check
@@ -38,7 +34,7 @@ def harness_args(out_dir: Path, scenarios: Path, checkpoint: Path, overrides: st
 
 @pytest.mark.slow
 def test_fixture_pipeline_end_to_end_gate_passes(tmp_path):
-    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch")
 
     checkpoint = tmp_path / "policy.pt"
     run_train(argparse.Namespace(
@@ -50,11 +46,10 @@ def test_fixture_pipeline_end_to_end_gate_passes(tmp_path):
     base_dir = tmp_path / "run_base"
     cand_dir = tmp_path / "run_cand"
     run_shadow(harness_args(base_dir, FIXTURES, checkpoint, None))
-    run_shadow(harness_args(cand_dir, FIXTURES, checkpoint, '{"early_braking": true}'))
+    run_shadow(harness_args(cand_dir, FIXTURES, checkpoint, '{"early_braking": true, "intersection_caution": true}'))
 
     assert (base_dir / "divergence.parquet").exists()
     assert (cand_dir / "divergence.parquet").exists()
-    events = json.loads('[]')
     assert (cand_dir / "override_events.parquet").exists()
 
     summary = run_clustering(base_dir / "divergence.parquet", tmp_path / "clusters",
@@ -70,9 +65,10 @@ def test_fixture_pipeline_end_to_end_gate_passes(tmp_path):
     save_labels(labels_path, labels)
 
     report = build_report_from_runs(base_dir, cand_dir, tmp_path / "clusters" / "cluster_model.joblib",
-                                    {"clusters": labels["clusters"]}, "early_braking", min_target_size=1)
+                                    {"clusters": labels["clusters"]}, ["early_braking", "intersection_caution"],
+                                    min_target_size=1)
     assert report["target_cluster"] in cluster_ids
-    assert report["override_stats"]["activations"] > 0
+    assert sum(st["activations"] for st in report["override_stats"].values()) > 0
 
     ok, rows = check(report, GATE_CFG)
     failed = [r["check"] for r in rows if not r["pass"]]
